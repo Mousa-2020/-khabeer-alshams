@@ -1,1492 +1,996 @@
-/* =============================================
-   خبير الشمس | Yemen Solar Expert
-   style.css — Dark Theme, Mobile-First, RTL
-   ============================================= */
-
-/* ---- Google Font Imports ---- */
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&family=Cairo:wght@400;600;700;900&display=swap');
-
-/* ---- CSS Custom Properties ---- */
-:root {
-  /* Core Colors */
-  --bg-deep:       #07090f;
-  --bg-base:       #0d0f1a;
-  --bg-surface:    #131625;
-  --bg-card:       #1a1d2e;
-  --bg-card-hover: #1f2338;
-  --bg-input:      #0f1120;
-
-  /* Gold — The Sun */
-  --gold-bright:   #ffcc44;
-  --gold-main:     #f5a623;
-  --gold-dim:      #c47d0e;
-  --gold-glow:     rgba(245, 166, 35, 0.25);
-  --gold-trace:    rgba(245, 166, 35, 0.08);
-
-  /* Blue — Electric Power */
-  --blue-neon:     #00d4ff;
-  --blue-main:     #0099cc;
-  --blue-dim:      #006b99;
-  --blue-glow:     rgba(0, 212, 255, 0.2);
-  --blue-trace:    rgba(0, 212, 255, 0.06);
-
-  /* Green — Success */
-  --green-main:    #06d6a0;
-  --green-glow:    rgba(6, 214, 160, 0.2);
-
-  /* Red — Warning */
-  --red-main:      #ff4d6d;
-  --red-glow:      rgba(255, 77, 109, 0.2);
-
-  /* Text */
-  --text-primary:  #eceef7;
-  --text-secondary:#8b8fa8;
-  --text-muted:    #4e526a;
-  --text-gold:     #f5a623;
-  --text-blue:     #00d4ff;
-
-  /* Borders */
-  --border-subtle: rgba(255,255,255,0.06);
-  --border-main:   rgba(255,255,255,0.12);
-  --border-gold:   rgba(245, 166, 35, 0.35);
-  --border-blue:   rgba(0, 212, 255, 0.3);
-
-  /* Typography */
-  --font-primary:  'Tajawal', 'Cairo', sans-serif;
-  --font-display:  'Cairo', 'Tajawal', sans-serif;
-
-  /* Spacing */
-  --space-xs:  0.25rem;
-  --space-sm:  0.5rem;
-  --space-md:  1rem;
-  --space-lg:  1.5rem;
-  --space-xl:  2rem;
-  --space-2xl: 3rem;
-
-  /* Radii */
-  --r-sm:   8px;
-  --r-md:   14px;
-  --r-lg:   20px;
-  --r-xl:   28px;
-  --r-full: 9999px;
-
-  /* Shadows */
-  --shadow-gold:  0 0 24px var(--gold-glow), 0 4px 20px rgba(0,0,0,0.4);
-  --shadow-blue:  0 0 24px var(--blue-glow), 0 4px 20px rgba(0,0,0,0.4);
-  --shadow-card:  0 4px 24px rgba(0,0,0,0.4), 0 1px 0 var(--border-subtle);
-
-  /* Transitions */
-  --t-fast:   0.15s ease;
-  --t-normal: 0.25s ease;
-  --t-slow:   0.4s cubic-bezier(0.4, 0, 0.2, 1);
+/**
+ * ================================================
+ *  خبير الشمس | Yemen Solar Expert
+ *  script.js — محرك الحسابات الهندسية
+ *
+ *  المعادلات المستخدمة:
+ *  1. الاستهلاك اليومي  : Wh = W x h
+ *  2. قوة الالواح       : P = Wh / PSH x F_loss x F_temp
+ *  3. البطاريات (Ah)    : Ah = Wh x days / (V x DoD x eff) x F_heat
+ *  4. المحول (Inverter) : VA = SurgeLoad x 1.25 / PF
+ *  5. هبوط الجهد (Wire) : A = (2 x L x I x rho) / DV_max
+ *  6. وحدة الشحن (CC)   : I_cc = P_panels / V_sys x 1.25
+ * ================================================
+ */
+
+'use strict';
+
+/* ================================================
+   قاعدة بيانات الاجهزة الكهربائية
+   ================================================
+   كل جهاز يحتوي على:
+   id          : معرف فريد
+   name        : الاسم بالعربي
+   icon        : الايموجي (HTML entity)
+   watts       : الاستهلاك الفعلي بالوات
+   surgeFactor : معامل تيار البدء (Surge Multiplier)
+                 1.0 = بدون محرك
+                 2.0-3.0 = اجهزة تحتوي على كمبريسور
+   hasMotor    : هل يحتوي على محرك؟
+   category    : التصنيف
+*/
+const APPLIANCES_DB = [
+  // --- اضاءة ---
+  {
+    id: 'led_bulb',
+    name: 'لمبة LED',
+    icon: '&#128161;',
+    watts: 10,
+    surgeFactor: 1.0,
+    hasMotor: false,
+    category: 'اضاءة'
+  },
+  {
+    id: 'led_strip',
+    name: 'شريط اضاءة LED',
+    icon: '&#10024;',
+    watts: 20,
+    surgeFactor: 1.0,
+    hasMotor: false,
+    category: 'اضاءة'
+  },
+  // --- تبريد ---
+  {
+    id: 'fan_ceiling',
+    name: 'مروحة سقف',
+    icon: '&#127744;',
+    watts: 75,
+    surgeFactor: 1.3,
+    hasMotor: true,
+    category: 'تبريد'
+  },
+  {
+    id: 'fan_table',
+    name: 'مروحة طاولة',
+    icon: '&#128168;',
+    watts: 45,
+    surgeFactor: 1.3,
+    hasMotor: true,
+    category: 'تبريد'
+  },
+  // --- الكترونيات ---
+  {
+    id: 'tv',
+    name: 'تلفزيون / شاشة',
+    icon: '&#128250;',
+    watts: 80,
+    surgeFactor: 1.0,
+    hasMotor: false,
+    category: 'الكترونيات'
+  },
+  {
+    id: 'phone_charger',
+    name: 'شاحن جوال',
+    icon: '&#128242;',
+    watts: 10,
+    surgeFactor: 1.0,
+    hasMotor: false,
+    category: 'الكترونيات'
+  },
+  {
+    id: 'laptop',
+    name: 'لابتوب / كمبيوتر',
+    icon: '&#128187;',
+    watts: 65,
+    surgeFactor: 1.0,
+    hasMotor: false,
+    category: 'الكترونيات'
+  },
+  {
+    id: 'router',
+    name: 'راوتر انترنت',
+    icon: '&#128225;',
+    watts: 15,
+    surgeFactor: 1.0,
+    hasMotor: false,
+    category: 'الكترونيات'
+  },
+  // --- اجهزة منزلية ---
+  {
+    id: 'fridge_small',
+    name: 'ثلاجة صغيرة',
+    icon: '&#129704;',
+    watts: 100,
+    surgeFactor: 3.0,
+    hasMotor: true,
+    category: 'اجهزة منزلية'
+    /* ملاحظة: الثلاجة لا تشتغل بشكل مستمر
+       Duty Cycle = 40% (تشغيل 40% من الوقت)
+       الاستهلاك الفعلي = 100W x 0.4 = 40W متوسط
+       لكن Surge = 100 x 3 = 300W عند بدء التشغيل */
+  },
+  {
+    id: 'fridge_large',
+    name: 'ثلاجة كبيرة',
+    icon: '&#127968;',
+    watts: 150,
+    surgeFactor: 3.0,
+    hasMotor: true,
+    category: 'اجهزة منزلية'
+  },
+  {
+    id: 'water_pump',
+    name: 'مضخة مياه',
+    icon: '&#128167;',
+    watts: 370,
+    surgeFactor: 3.0,
+    hasMotor: true,
+    category: 'اجهزة منزلية'
+  },
+  {
+    id: 'washing_machine',
+    name: 'غسالة ملابس',
+    icon: '&#129399;',
+    watts: 500,
+    surgeFactor: 2.0,
+    hasMotor: true,
+    category: 'اجهزة منزلية'
+  },
+  // --- مطبخ ---
+  {
+    id: 'blender',
+    name: 'خلاط / محضرة',
+    icon: '&#129379;',
+    watts: 350,
+    surgeFactor: 2.0,
+    hasMotor: true,
+    category: 'مطبخ'
+  },
+  {
+    id: 'electric_kettle',
+    name: 'غلاية كهربائية',
+    icon: '&#9749;',
+    watts: 1000,
+    surgeFactor: 1.0,
+    hasMotor: false,
+    category: 'مطبخ'
+  },
+];
+
+/* ================================================
+   بيانات المدن
+   ================================================ */
+const CITY_DATA = {
+  aden: {
+    name: 'عدن',
+    emoji: '&#127754;',
+    emojiPlain: 'عدن',
+    /*
+     * PSH = Peak Sun Hours (ساعات الذروة الشمسية)
+     * عدن: متوسط 5.5 ساعة ذروة يومياً
+     * المصدر: NASA SSE / خط عرض 12.8N
+     */
+    peakSunHours: 5.5,
+    /*
+     * معامل الامان الحراري للبطاريات:
+     * عدن تصل لـ 40C+ مما يقلل كفاءة بطاريات الاسيد 15-20%
+     * نضيف 15% تعويضاً على سعة البطارية
+     */
+    batteryHeatFactor: 1.15,
+    /*
+     * معامل انخفاض كفاءة الالواح بسبب الحرارة:
+     * كل درجة فوق 25C تخسر الالواح ~0.45% من كفاءتها
+     * في عدن صيفاً 50C -> (50-25) x 0.0045 = ~11% خسارة
+     */
+    panelTempFactor: 1.10,
+    infoBanner: 'عدن: حرارة عالية جداً تؤثر على البطاريات والالواح. سيتم اضافة هامش امان 15% على سعة البطاريات تعويضاً عن الحرارة، ويُنصح بتهوية جيدة لمنع غليان البطاريات.',
+    tiltTip: 'وجّه الالواح ناحية الجنوب بميل 15 درجة.',
+    cityTips: [
+      { icon: '&#127777;', text: 'ركّب البطاريات في مكان مظلل وجيد التهوية. الحرارة اكبر عدو للبطارية في عدن.' },
+      { icon: '&#128295;', text: 'افحص مستوى ماء بطاريات الاسيد كل شهر. الحرارة تسرع تبخره.' },
+      { icon: '&#9728;', text: 'وجّه الالواح ناحية الجنوب الجغرافي بميل 15 درجة لتحقيق افضل انتاجية.' },
+      { icon: '&#128268;', text: 'استخدم كيبلات مقاومة للحرارة UV. اشعة عدن تتلف العزل السريع.' },
+    ]
+  },
+  dhale: {
+    name: 'الضالع',
+    emoji: '&#9968;',
+    emojiPlain: 'الضالع',
+    /*
+     * PSH في الضالع: متوسط 5.0 ساعة ذروة
+     * (خط عرض 13.7N، ارتفاع ~1500م)
+     */
+    peakSunHours: 5.0,
+    /*
+     * الضالع اكثر اعتدالاً حرارياً
+     * لا حاجة لهامش حراري اضافي
+     */
+    batteryHeatFactor: 1.0,
+    panelTempFactor: 1.0,
+    infoBanner: 'الضالع: مناخ معتدل ومرتفعات صافية. زاوية الميل المثالية للالواح هي 30 درجة نحو الجنوب للحصول على افضل كفاءة سنوية.',
+    tiltTip: 'زاوية الميل المثلى في الضالع: 30 درجة نحو الجنوب الجغرافي.',
+    cityTips: [
+      { icon: '&#128208;', text: 'اضبط زاوية ميل الالواح على 30 درجة نحو الجنوب. هذا يزيد الانتاجية 10-15%.' },
+      { icon: '&#127788;', text: 'رياح الضالع قد تكون قوية. تاكد من تثبيت الالواح باطارات صلبة جيداً.' },
+      { icon: '&#127783;', text: 'في الشتاء ارفع زاوية الميل قليلاً (35-40 درجة) للاستفادة من الشمس المنخفضة.' },
+      { icon: '&#128267;', text: 'البطاريات في الضالع تعمل بكفاءة اكبر بسبب الاعتدال الحراري. عمرها اطول.' },
+    ]
+  }
+};
+
+/* ================================================
+   جدول اسماك الاسلاك القياسية (mm2)
+   المصدر: IEC 60228 Standard
+   ================================================ */
+const WIRE_GAUGES_MM2 = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50];
+
+/*
+ * مقاومة النحاس الكهربائية rho
+ * rho = 0.0178 ohm.mm2/m عند 20C
+ * في الحرارة العالية (50C عدن) تزيد ~10%: 0.0196
+ */
+const COPPER_RESISTIVITY_NORMAL = 0.0178;
+const COPPER_RESISTIVITY_HOT    = 0.0196;
+
+/* ================================================
+   حالة التطبيق
+   ================================================ */
+const state = {
+  currentStep:   1,
+  city:          null,
+  appliances:    {},
+  wireDistance:  5,
+  systemVoltage: 24,
+  autonomyDays:  2,
+};
+
+/* ================================================
+   التهيئة عند تحميل الصفحة
+   ================================================ */
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    var splash = document.getElementById('splash');
+    var app    = document.getElementById('app');
+    splash.classList.add('fade-out');
+    setTimeout(function() {
+      splash.style.display = 'none';
+      app.style.display    = 'flex';
+      buildAppliancesList();
+      updateLiveSummary();
+      updateWirePreview();
+    }, 600);
+  }, 2200);
+});
+
+/* ================================================
+   الخطوة 1 — اختيار المدينة
+   ================================================ */
+
+function selectCity(card) {
+  // ازالة الاختيار من كل البطاقات
+  document.querySelectorAll('.city-card').forEach(function(c) {
+    c.classList.remove('selected');
+  });
+
+  card.classList.add('selected');
+  state.city = card.dataset.city;
+
+  // تحديث شارة المدينة في الهيدر
+  var badge      = document.getElementById('cityBadge');
+  badge.textContent = CITY_DATA[state.city].name;
+  badge.style.display = 'block';
+
+  // عرض لافتة المعلومات
+  var banner      = document.getElementById('cityInfoBanner');
+  banner.textContent = CITY_DATA[state.city].infoBanner;
+  banner.style.display = 'block';
+
+  // تفعيل زر التالي
+  document.getElementById('btnNext1').disabled = false;
+}
+
+/* ================================================
+   الخطوة 2 — بناء قائمة الاجهزة
+   ================================================ */
+
+function buildAppliancesList() {
+  var container = document.getElementById('appliancesContainer');
+
+  // تجميع الاجهزة حسب التصنيف
+  var categories = {};
+  APPLIANCES_DB.forEach(function(device) {
+    if (!categories[device.category]) {
+      categories[device.category] = [];
+    }
+    categories[device.category].push(device);
+  });
+
+  // تهيئة state.appliances
+  APPLIANCES_DB.forEach(function(device) {
+    state.appliances[device.id] = { qty: 0, dayHours: 4, nightHours: 3 };
+  });
+
+  // بناء HTML
+  var html = '';
+
+  Object.keys(categories).forEach(function(catName) {
+    var devices = categories[catName];
+    html += '<div class="appliance-category-group">';
+    html += '<div class="category-label">' + catName + '</div>';
+
+    devices.forEach(function(device) {
+      var surgeLabel = device.hasMotor
+        ? '<span class="surge-tag">Surge x' + device.surgeFactor + '</span>'
+        : '';
+
+      html += '<div class="appliance-item" id="item-' + device.id + '">';
+      html += '  <div class="appliance-header" onclick="toggleAppliance('' + device.id + '')">';
+      html += '    <div class="appliance-emoji">' + device.icon + '</div>';
+      html += '    <div class="appliance-info">';
+      html += '      <div class="appliance-name">' + device.name + '</div>';
+      html += '      <div class="appliance-watt">' + surgeLabel + device.watts + ' وات</div>';
+      html += '    </div>';
+      html += '    <div class="appliance-counter">';
+      html += '      <button class="counter-btn minus" onclick="changeQty(event,'' + device.id + '',-1)">&#8722;</button>';
+      html += '      <span class="counter-val" id="qty-' + device.id + '">0</span>';
+      html += '      <button class="counter-btn plus" onclick="changeQty(event,'' + device.id + '',+1)">+</button>';
+      html += '    </div>';
+      html += '  </div>';
+      html += '  <div class="appliance-hours">';
+      html += '    <div class="hours-grid">';
+      html += '      <div class="hours-input-group">';
+      html += '        <div class="hours-label"><span class="label-icon">&#9728;</span> ساعات النهار</div>';
+      html += '        <div class="hours-slider-wrap">';
+      html += '          <input type="range" min="0" max="12" step="1" class="hours-slider" id="day-' + device.id + '" value="4" oninput="updateHours('' + device.id + '','day',this.value)" />';
+      html += '          <span class="hours-val-display" id="dayVal-' + device.id + '">4</span>';
+      html += '        </div>';
+      html += '      </div>';
+      html += '      <div class="hours-input-group">';
+      html += '        <div class="hours-label"><span class="label-icon">&#127769;</span> ساعات الليل</div>';
+      html += '        <div class="hours-slider-wrap">';
+      html += '          <input type="range" min="0" max="12" step="1" class="hours-slider night" id="night-' + device.id + '" value="3" oninput="updateHours('' + device.id + '','night',this.value)" />';
+      html += '          <span class="hours-val-display night" id="nightVal-' + device.id + '">3</span>';
+      html += '        </div>';
+      html += '      </div>';
+      html += '    </div>';
+      html += '    <div class="wh-preview" id="whPreview-' + device.id + '">';
+      html += '      <span>الاستهلاك اليومي لهذا الجهاز</span>';
+      html += '      <span id="whVal-' + device.id + '">0 Wh</span>';
+      html += '    </div>';
+      html += '  </div>';
+      html += '</div>';
+    });
+
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function toggleAppliance(id) {
+  var item = document.getElementById('item-' + id);
+  if (state.appliances[id].qty > 0) {
+    item.classList.toggle('active');
+  }
+}
+
+function changeQty(e, id, delta) {
+  e.stopPropagation();
+
+  var a    = state.appliances[id];
+  var newQ = Math.max(0, Math.min(10, a.qty + delta));
+  a.qty    = newQ;
+
+  document.getElementById('qty-' + id).textContent = newQ;
+
+  var item = document.getElementById('item-' + id);
+  if (newQ > 0) {
+    item.classList.add('active');
+  } else {
+    item.classList.remove('active');
+  }
+
+  updateWhPreview(id);
+  updateLiveSummary();
+}
+
+function updateHours(id, type, val) {
+  var numVal = parseInt(val);
+  if (type === 'day') {
+    state.appliances[id].dayHours = numVal;
+    document.getElementById('dayVal-' + id).textContent = numVal;
+  } else {
+    state.appliances[id].nightHours = numVal;
+    document.getElementById('nightVal-' + id).textContent = numVal;
+  }
+  updateWhPreview(id);
+  updateLiveSummary();
+}
+
+/*
+ * حساب استهلاك جهاز واحد يومياً (وات ساعة)
+ * للثلاجات: نأخذ Duty Cycle 40% لانها لا تعمل باستمرار
+ */
+function calcDeviceWh(device, appState) {
+  var qty        = appState.qty;
+  var dayHours   = appState.dayHours;
+  var nightHours = appState.nightHours;
+  if (qty === 0) return 0;
+
+  var effectiveWatts = device.watts;
+  if (device.id === 'fridge_small' || device.id === 'fridge_large') {
+    effectiveWatts = device.watts * 0.4;
+  }
+
+  return effectiveWatts * qty * (dayHours + nightHours);
+}
+
+function updateWhPreview(id) {
+  var device = null;
+  for (var i = 0; i < APPLIANCES_DB.length; i++) {
+    if (APPLIANCES_DB[i].id === id) { device = APPLIANCES_DB[i]; break; }
+  }
+  if (!device) return;
+
+  var wh = calcDeviceWh(device, state.appliances[id]);
+  document.getElementById('whVal-' + id).textContent = Math.round(wh) + ' Wh';
+}
+
+function updateLiveSummary() {
+  var summary = getLoadSummary();
+
+  document.getElementById('sumDevices').textContent = summary.activeDevices + ' جهاز';
+  document.getElementById('sumWh').textContent      = Math.round(summary.totalWh) + ' Wh';
+  document.getElementById('sumWatts').textContent   = Math.round(summary.peakLoad) + ' W';
+}
+
+/*
+ * جمع ملخص الاحمال الكلية
+ * يرجع: totalWh, dayWh, nightWh, peakLoad, surgeLoad, activeDevices
+ */
+function getLoadSummary() {
+  var totalWh       = 0;
+  var dayWh         = 0;
+  var nightWh       = 0;
+  var peakLoad      = 0;
+  var activeDevices = 0;
+  var maxSurgeExtra = 0;
+
+  APPLIANCES_DB.forEach(function(device) {
+    var a = state.appliances[device.id];
+    if (!a || a.qty === 0) return;
+    activeDevices++;
+
+    var effectiveWatts = device.watts;
+    if (device.id === 'fridge_small' || device.id === 'fridge_large') {
+      effectiveWatts = device.watts * 0.4;
+    }
+
+    dayWh   += effectiveWatts * a.qty * a.dayHours;
+    nightWh += effectiveWatts * a.qty * a.nightHours;
+    peakLoad += effectiveWatts * a.qty;
+
+    /*
+     * حساب Surge:
+     * في لحظة البدء، الجهاز ذو اعلى surge يسحب تيار بدء عالٍ
+     * نحسب الفرق بين surge والتشغيل العادي لهذا الجهاز
+     * ونضيف الفرق الاعلى فقط (لانه نادراً ما تبدأ جميع الاجهزة معاً)
+     */
+    var surgeExtra = effectiveWatts * a.qty * (device.surgeFactor - 1.0);
+    if (surgeExtra > maxSurgeExtra) {
+      maxSurgeExtra = surgeExtra;
+    }
+  });
+
+  totalWh = dayWh + nightWh;
+  var surgeLoad = peakLoad + maxSurgeExtra;
+
+  return {
+    totalWh:       totalWh,
+    dayWh:         dayWh,
+    nightWh:       nightWh,
+    peakLoad:      peakLoad,
+    surgeLoad:     surgeLoad,
+    activeDevices: activeDevices
+  };
+}
+
+/* ================================================
+   الخطوة 3 — الاسلاك والاعدادات
+   ================================================ */
+
+function changeDistance(delta) {
+  var input  = document.getElementById('wireDistance');
+  var newVal = Math.max(1, Math.min(100, parseInt(input.value || 5) + delta));
+  input.value        = newVal;
+  state.wireDistance = newVal;
+  updateWirePreview();
+}
+
+function setDistance(val) {
+  document.getElementById('wireDistance').value = val;
+  state.wireDistance = val;
+  document.querySelectorAll('.preset-btn').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  var btn = document.querySelector('.preset-btn[onclick="setDistance(' + val + ')"]');
+  if (btn) btn.classList.add('active');
+  updateWirePreview();
+}
+
+function selectVoltage(el) {
+  document.querySelectorAll('.volt-option').forEach(function(v) {
+    v.classList.remove('selected');
+  });
+  el.classList.add('selected');
+  state.systemVoltage = parseInt(el.dataset.volt);
+  updateWirePreview();
+}
+
+function selectAutonomy(el) {
+  document.querySelectorAll('.auto-option').forEach(function(a) {
+    a.classList.remove('selected');
+  });
+  el.classList.add('selected');
+  state.autonomyDays = parseInt(el.dataset.days);
+}
+
+function updateWirePreview() {
+  var dist     = parseInt(document.getElementById('wireDistance').value || 5);
+  state.wireDistance = dist;
+
+  var summary  = getLoadSummary();
+  var peakLoad = summary.peakLoad;
+  var prevText = document.getElementById('wirePreviewText');
+
+  if (peakLoad === 0) {
+    prevText.textContent = 'اضف الاجهزة اولاً لرؤية التوصية';
+    return;
+  }
+
+  var I  = peakLoad / state.systemVoltage;
+  var mm = calcWireGauge(dist, I, state.city === 'aden');
+  prevText.textContent = 'مسافة ' + dist + 'م — تيار ' + Math.round(I) + 'A — سلك ' + mm + ' mm2 موصى به';
+}
+
+/*
+ * حساب سُمك السلك المناسب (Voltage Drop Calculation)
+ *
+ * المعادلة:
+ *   DV_max = V_system x 0.03   (هبوط جهد مسموح = 3% من جهد المنظومة)
+ *   A_min  = (2 x L x I x rho) / DV_max
+ *
+ * الضرب في 2 لان التيار يمر ذهاباً وايابا
+ * ثم نختار من الجدول القياسي الحجم الاعلى الاقرب
+ *
+ * @param {number}  L      - طول السلك بالامتار
+ * @param {number}  I      - التيار بالامبير
+ * @param {boolean} isHot  - هل الطقس حار (عدن)؟
+ * @returns {number} سُمك السلك بـ mm2
+ */
+function calcWireGauge(L, I, isHot) {
+  var rho    = isHot ? COPPER_RESISTIVITY_HOT : COPPER_RESISTIVITY_NORMAL;
+  var dV_max = state.systemVoltage * 0.03;  // 3% هبوط مسموح
+
+  /*
+   * A_min = (2 x L x I x rho) / DV_max
+   * الوحدة: mm2
+   */
+  var A_calc = (2 * L * I * rho) / dV_max;
+
+  // اختيار اقرب حجم قياسي اعلى من القيمة المحسوبة
+  for (var k = 0; k < WIRE_GAUGES_MM2.length; k++) {
+    if (WIRE_GAUGES_MM2[k] >= A_calc) {
+      return WIRE_GAUGES_MM2[k];
+    }
+  }
+  return WIRE_GAUGES_MM2[WIRE_GAUGES_MM2.length - 1];
+}
+
+/* ================================================
+   الخطوة 4 — الحسابات الكاملة وعرض النتائج
+   ================================================ */
+
+function calculateResults() {
+  if (!state.city) {
+    showToast('الرجاء اختيار المدينة اولاً');
+    return;
+  }
+
+  var summary       = getLoadSummary();
+  var totalWh       = summary.totalWh;
+  var dayWh         = summary.dayWh;
+  var nightWh       = summary.nightWh;
+  var peakLoad      = summary.peakLoad;
+  var surgeLoad     = summary.surgeLoad;
+  var activeDevices = summary.activeDevices;
+
+  if (activeDevices === 0) {
+    showToast('الرجاء اضافة جهاز واحد على الاقل');
+    return;
+  }
+
+  var cityData = CITY_DATA[state.city];
+
+  /* -----------------------------------------------
+     2) حساب قوة الالواح الشمسية
+     -----------------------------------------------
+     المعادلة:
+       P_panels = (Wh_total / PSH) x F_sys x F_temp
+     
+     حيث:
+       Wh_total = الاستهلاك اليومي الكلي
+       PSH      = ساعات الذروة الشمسية (5.5 عدن / 5.0 ضالع)
+       F_sys    = معامل خسائر النظام = 1.25
+                  (كيبلات 3% + اتربة 5% + شحن/تفريغ 8% + حرارة 9%)
+       F_temp   = معامل الحرارة على الالواح للمدينة
+  ----------------------------------------------- */
+  var PSH          = cityData.peakSunHours;
+  var F_sys        = 1.25;
+  var F_temp       = cityData.panelTempFactor;
+  var totalPanelW  = (totalWh / PSH) * F_sys * F_temp;
+
+  var bestPanelW   = choosePanelSize(totalPanelW);
+  var panelCount   = Math.ceil(totalPanelW / bestPanelW);
+  var actualPanelW = panelCount * bestPanelW;
+
+  /* -----------------------------------------------
+     3) حساب سعة البطاريات
+     -----------------------------------------------
+     المعادلة:
+       Ah = (Wh_total x Days) / (V_sys x DoD x eta_bat) x F_heat
+     
+     حيث:
+       Days   = ايام الاحتياط (اختيار المستخدم)
+       V_sys  = جهد المنظومة
+       DoD    = عمق التفريغ المسموح = 0.5 (50%)
+                ** السر الرئيسي في اطالة عمر البطارية **
+                ** التفريغ لـ 50% فقط يضاعف العمر الافتراضي **
+       eta_bat = كفاءة البطارية = 0.85
+       F_heat  = معامل الحرارة للمدينة (عدن +15%)
+  ----------------------------------------------- */
+  var DoD     = 0.5;   // عمق التفريغ — 50% لحماية البطاريات
+  var eta_bat = 0.85;  // كفاءة البطارية
+  var F_heat  = cityData.batteryHeatFactor;
+
+  var rawAh   = (totalWh * state.autonomyDays) / (state.systemVoltage * DoD * eta_bat);
+  var totalAh = Math.ceil(rawAh * F_heat);
+
+  var batSizes  = [100, 120, 150, 200, 250];
+  var bestBatAh = chooseBatterySize(totalAh, batSizes);
+  var batCount  = Math.ceil(totalAh / bestBatAh);
+  var batType   = recommendBatteryType(totalAh, state.systemVoltage);
+
+  /* -----------------------------------------------
+     4) حساب قوة المحول (Inverter)
+     -----------------------------------------------
+     المعادلة:
+       VA = Surge_Load x F_safety / PF
+     
+     حيث:
+       Surge_Load  = اقصى حمل لحظي شامل بدايات المحركات
+       F_safety    = معامل امان = 1.25
+       PF          = Power Factor = 0.8 للاحمال المختلطة
+       VA = W / PF  (تحويل وات الى فولت-امبير)
+  ----------------------------------------------- */
+  var F_inv_safety = 1.25;
+  var PF           = 0.8;
+  var inverterVA   = Math.ceil((surgeLoad * F_inv_safety) / PF);
+  var inverterStd  = roundUpToStandard(inverterVA, [500,700,1000,1500,2000,3000,4000,5000,6000,8000,10000]);
+
+  /* -----------------------------------------------
+     5) حساب سُمك السلك (Voltage Drop)
+     -----------------------------------------------
+     تفاصيل المعادلة:
+       I_max   = P_panels / V_sys  (اقصى تيار من الالواح)
+       DV_max  = V_sys x 0.03      (3% هبوط مسموح)
+       A_min   = (2 x L x I x rho) / DV_max
+  ----------------------------------------------- */
+  var I_wire   = actualPanelW / state.systemVoltage;
+  var wireMM   = calcWireGauge(state.wireDistance, I_wire, state.city === 'aden');
+
+  /* حساب هبوط الجهد الفعلي للتحقق */
+  var vdrop    = (2 * state.wireDistance * I_wire * COPPER_RESISTIVITY_NORMAL) / wireMM;
+  var vdropPct = ((vdrop / state.systemVoltage) * 100).toFixed(1);
+
+  /* -----------------------------------------------
+     6) وحدة الشحن (Charge Controller / MPPT)
+     -----------------------------------------------
+     المعادلة:
+       I_cc = (P_panels / V_battery) x 1.25
+     
+     نوصي بـ MPPT بدل PWM لانها اكفأ بـ 15-30%
+  ----------------------------------------------- */
+  var I_cc  = Math.ceil((actualPanelW / state.systemVoltage) * 1.25);
+  var ccStd = roundUpToStandard(I_cc, [10, 20, 30, 40, 50, 60, 80, 100]);
+
+  // عرض النتائج
+  displayResults({
+    totalWh: totalWh,
+    dayWh: dayWh,
+    nightWh: nightWh,
+    peakLoad: peakLoad,
+    totalPanelW: totalPanelW,
+    panelCount: panelCount,
+    bestPanelW: bestPanelW,
+    actualPanelW: actualPanelW,
+    totalAh: totalAh,
+    batCount: batCount,
+    bestBatAh: bestBatAh,
+    batType: batType,
+    inverterVA: inverterVA,
+    inverterStd: inverterStd,
+    wireMM: wireMM,
+    vdropPct: vdropPct,
+    I_cc: I_cc,
+    ccStd: ccStd,
+    cityData: cityData,
+    activeDevices: activeDevices
+  });
+
+  goToStep(4);
+}
+
+/* ---- دوال مساعدة للحسابات ---- */
+
+function choosePanelSize(totalPanelW) {
+  if (totalPanelW <= 200)  return 100;
+  if (totalPanelW <= 600)  return 200;
+  if (totalPanelW <= 1200) return 300;
+  if (totalPanelW <= 2000) return 400;
+  return 500;
+}
+
+function chooseBatterySize(totalAh, sizes) {
+  var sorted = sizes.slice().sort(function(a,b) { return b - a; });
+  for (var i = 0; i < sorted.length; i++) {
+    if (totalAh / sorted[i] <= 6) return sorted[i];
+  }
+  return sizes[0];
+}
+
+function recommendBatteryType(totalAh, voltage) {
+  if ((totalAh * voltage) > 5000) return 'ليثيوم LiFePO4 او جل Gel';
+  if (totalAh > 300)              return 'جل Gel او AGM مغلقة';
+  return 'AGM مغلقة او تقليدية بالماء';
+}
+
+function roundUpToStandard(val, standards) {
+  for (var i = 0; i < standards.length; i++) {
+    if (standards[i] >= val) return standards[i];
+  }
+  return standards[standards.length - 1];
+}
+
+/* ================================================
+   عرض النتائج في الواجهة
+   ================================================ */
+function displayResults(r) {
+  var cityData = r.cityData;
+  var V        = state.systemVoltage;
+
+  // الترويسة
+  document.getElementById('resultsSubtitle').textContent =
+    cityData.name + ' — ' + r.activeDevices + ' اجهزة';
+
+  // 1) الاستهلاك
+  document.getElementById('totalWh').textContent  = Math.round(r.totalWh);
+  document.getElementById('dayWh').textContent    = Math.round(r.dayWh) + ' Wh نهاراً';
+  document.getElementById('nightWh').textContent  = Math.round(r.nightWh) + ' Wh ليلاً';
+  document.getElementById('peakLoad').textContent = Math.round(r.peakLoad) + ' W';
+
+  // 2) الالواح
+  document.getElementById('panelCount').textContent = r.panelCount;
+  document.getElementById('panelDetail').innerHTML  =
+    r.panelCount + ' لوح × ' + r.bestPanelW + ' وات<br>' +
+    'اجمالي القوة: <strong>' + r.actualPanelW + ' وات</strong><br>' +
+    'الطاقة المطلوبة: ' + Math.round(r.totalPanelW) + ' وات';
+  document.getElementById('panelTip').textContent = cityData.tiltTip;
+
+  // 3) البطاريات
+  document.getElementById('batteryAh').textContent  = r.totalAh;
+  document.getElementById('batteryDetail').innerHTML =
+    r.batCount + ' بطارية × ' + r.bestBatAh + ' Ah<br>' +
+    'جهد المنظومة: ' + V + ' فولت<br>' +
+    'النوع المقترح: ' + r.batType;
+  document.getElementById('batteryTip').innerHTML =
+    '<strong>مهم:</strong> لا تفرّغ البطارية اكثر من 50% — هذا يُضاعف عمرها الافتراضي' +
+    (state.city === 'aden' ? '<br>اُضيف +15% تعويض حراري لعدن' : '');
+
+  // 4) المحول
+  document.getElementById('inverterVA').textContent  = r.inverterStd;
+  document.getElementById('inverterDetail').innerHTML =
+    'الحمل الجاري: ' + Math.round(r.peakLoad) + ' وات<br>' +
+    'مقترح: ' + r.inverterStd + ' VA';
+  document.getElementById('inverterTip').textContent =
+    'تاكد ان المحول يدعم Pure Sine Wave لحماية الاجهزة الحساسة';
+
+  // 5) الاسلاك
+  document.getElementById('wireMM').textContent    = r.wireMM;
+  document.getElementById('wireDetail').innerHTML  =
+    'مسافة: ' + state.wireDistance + ' متر<br>' +
+    'هبوط الجهد: ' + r.vdropPct + '% فقط (مقبول)';
+  document.getElementById('wireTip').textContent   =
+    'استخدم نحاس خالص (Copper) وليس الومنيوم — النحاس اامن واطول عمراً';
+
+  // 6) وحدة الشحن
+  document.getElementById('ccAmpere').textContent  = r.ccStd;
+  document.getElementById('ccDetail').innerHTML    =
+    'نوع مقترح: MPPT (افضل من PWM بـ 15-30%)<br>' +
+    'جهد المنظومة: ' + V + ' فولت<br>' +
+    'تيار الالواح: ' + Math.round(r.I_cc) + ' امبير';
+  document.getElementById('ccTip').textContent     =
+    'MPPT اغلى لكنها توفر 15-30% طاقة اضافية — تستحق الاستثمار';
+
+  // 7) نصائح الخبير
+  var tipsEl  = document.getElementById('expertTipsList');
+  var allTips = cityData.cityTips.concat([
+    { icon: '&#128267;', text: 'اشتري بطاريات ' + r.batType + ' من مصادر موثوقة. البطاريات المقلدة السبب الاول في تلف المنظومة.' },
+    { icon: '&#9888;', text: 'لا تشغّل الغسالة والمضخة في نفس الوقت. الـ Surge المشترك قد يحرق المحول.' },
+    { icon: '&#128267;', text: 'افحص البطاريات كل 3 اشهر. تحقق من الجهد الكامل ومستوى الماء.' },
+  ]);
+
+  var tipsHTML = '';
+  allTips.forEach(function(t) {
+    tipsHTML += '<li><span class="tip-icon">' + t.icon + '</span><span>' + t.text + '</span></li>';
+  });
+  tipsEl.innerHTML = tipsHTML;
+
+  // 8) نص المشاركة
+  buildShareText(r);
+}
+
+function buildShareText(r) {
+  var V    = state.systemVoltage;
+  var city = r.cityData.name;
+
+  var text =
+    'خبير الشمس — روشتة المنظومة الشمسية
+' +
+    '================================
+' +
+    'المنطقة: ' + city + '
+' +
+    'الاستهلاك اليومي: ' + Math.round(r.totalWh) + ' Wh
+' +
+    '--------------------------------
+' +
+    'الالواح الشمسية:
+' +
+    '  ' + r.panelCount + ' لوح x ' + r.bestPanelW + ' وات = ' + r.actualPanelW + ' وات
+' +
+    'البطاريات:
+' +
+    '  ' + r.batCount + ' بطارية x ' + r.bestBatAh + ' Ah (' + V + 'V)
+' +
+    '  النوع: ' + r.batType + '
+' +
+    'المحول (Inverter): ' + r.inverterStd + ' VA
+' +
+    'وحدة الشحن MPPT: ' + r.ccStd + ' A
+' +
+    'سُمك الاسلاك: ' + r.wireMM + ' mm2
+' +
+    '--------------------------------
+' +
+    'تنبيه: لا تفرّغ البطارية اكثر من 50%
+' +
+    r.cityData.tiltTip + '
+' +
+    '================================
+' +
+    'Yemen Solar Expert';
+
+  document.getElementById('shareTextBox').textContent = text;
+  window._shareText = text;
+}
+
+function shareWhatsApp() {
+  var encoded = encodeURIComponent(window._shareText || '');
+  window.open('https://wa.me/?text=' + encoded, '_blank');
+}
+
+function copyToClipboard() {
+  if (navigator.clipboard && window._shareText) {
+    navigator.clipboard.writeText(window._shareText).then(function() {
+      var btn = document.getElementById('btnCopy');
+      btn.classList.add('copied');
+      btn.querySelector('span:last-child').textContent = 'تم النسخ';
+      showToast('تم نسخ الروشتة بنجاح');
+      setTimeout(function() {
+        btn.classList.remove('copied');
+        btn.querySelector('span:last-child').textContent = 'نسخ النص';
+      }, 2500);
+    });
+  }
+}
+
+/* ================================================
+   التنقل بين الخطوات
+   ================================================ */
+
+function goToStep(step) {
+  if (step === 2 && !state.city) {
+    showToast('اختر المدينة اولاً');
+    return;
+  }
+
+  var currentPanel = document.querySelector('.step-panel.active');
+  if (currentPanel) currentPanel.classList.remove('active');
+
+  var nextPanel = document.getElementById('panel' + step);
+  if (nextPanel) nextPanel.classList.add('active');
+
+  updateStepper(step);
+  state.currentStep = step;
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateStepper(activeStep) {
+  for (var i = 1; i <= 4; i++) {
+    var item = document.getElementById('stepItem' + i);
+    item.classList.remove('active', 'completed');
+
+    if (i < activeStep)       item.classList.add('completed');
+    else if (i === activeStep) item.classList.add('active');
+  }
+
+  for (var j = 1; j <= 3; j++) {
+    var line = document.getElementById('line' + j + (j + 1));
+    if (line) {
+      if (j < activeStep) {
+        line.classList.add('active');
+      } else {
+        line.classList.remove('active');
+      }
+    }
+  }
+}
+
+/* ================================================
+   إعادة ضبط التطبيق
+   ================================================ */
+function restartApp() {
+  state.city          = null;
+  state.appliances    = {};
+  state.wireDistance  = 5;
+  state.systemVoltage = 24;
+  state.autonomyDays  = 2;
+
+  document.querySelectorAll('.city-card').forEach(function(c) {
+    c.classList.remove('selected');
+  });
+  document.getElementById('cityBadge').style.display      = 'none';
+  document.getElementById('cityInfoBanner').style.display = 'none';
+  document.getElementById('btnNext1').disabled             = true;
+
+  buildAppliancesList();
+  updateLiveSummary();
+  document.getElementById('wireDistance').value = 5;
+
+  goToStep(1);
+  showToast('تم اعادة الضبط بنجاح');
+}
+
+/* ================================================
+   الإشعار المؤقت Toast
+   ================================================ */
+function showToast(msg) {
+  var toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(function() {
+    toast.classList.remove('show');
+  }, 2500);
 }
-
-/* =============================================
-   RESET & BASE
-   ============================================= */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-
-html {
-  font-size: 16px;
-  scroll-behavior: smooth;
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  font-family: var(--font-primary);
-  background-color: var(--bg-deep);
-  color: var(--text-primary);
-  min-height: 100vh;
-  direction: rtl;
-  overflow-x: hidden;
-  line-height: 1.6;
-  /* Subtle grid texture */
-  background-image:
-    radial-gradient(ellipse at 20% 0%, rgba(245, 166, 35, 0.04) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(0, 212, 255, 0.04) 0%, transparent 50%);
-}
-
-button {
-  font-family: var(--font-primary);
-  cursor: pointer;
-  border: none;
-  outline: none;
-  user-select: none;
-}
-
-input {
-  font-family: var(--font-primary);
-  outline: none;
-  border: none;
-}
-
-ul { list-style: none; }
-
-/* =============================================
-   SPLASH SCREEN
-   ============================================= */
-.splash {
-  position: fixed;
-  inset: 0;
-  background: var(--bg-deep);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  transition: opacity 0.6s ease, transform 0.6s ease;
-}
-
-.splash.fade-out {
-  opacity: 0;
-  transform: scale(1.05);
-  pointer-events: none;
-}
-
-.splash-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-md);
-  animation: splashIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-@keyframes splashIn {
-  from { opacity: 0; transform: translateY(30px) scale(0.95); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.sun-burst {
-  position: relative;
-  width: 100px;
-  height: 100px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: var(--space-sm);
-}
-
-.sun-core {
-  font-size: 56px;
-  animation: sunPulse 2.5s ease-in-out infinite;
-  filter: drop-shadow(0 0 20px var(--gold-main));
-  position: relative;
-  z-index: 2;
-}
-
-@keyframes sunPulse {
-  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px var(--gold-main)); }
-  50%       { transform: scale(1.1); filter: drop-shadow(0 0 35px var(--gold-bright)); }
-}
-
-.ray {
-  position: absolute;
-  width: 3px;
-  height: 18px;
-  background: linear-gradient(to bottom, var(--gold-bright), transparent);
-  border-radius: var(--r-full);
-  transform-origin: 50% calc(50px + 9px);
-  opacity: 0.7;
-  animation: rayShine 2.5s ease-in-out infinite;
-}
-
-@keyframes rayShine {
-  0%, 100% { opacity: 0.5; transform-origin: 50% calc(50px + 9px); }
-  50%       { opacity: 1; transform-origin: 50% calc(50px + 9px); }
-}
-
-.r1 { transform: rotate(0deg)   translateY(-58px) rotate(0deg); }
-.r2 { transform: rotate(45deg)  translateY(-58px) rotate(-45deg); }
-.r3 { transform: rotate(90deg)  translateY(-58px) rotate(-90deg); }
-.r4 { transform: rotate(135deg) translateY(-58px) rotate(-135deg); }
-.r5 { transform: rotate(180deg) translateY(-58px) rotate(-180deg); }
-.r6 { transform: rotate(225deg) translateY(-58px) rotate(-225deg); }
-.r7 { transform: rotate(270deg) translateY(-58px) rotate(-270deg); }
-.r8 { transform: rotate(315deg) translateY(-58px) rotate(-315deg); }
-
-.splash-title {
-  font-family: var(--font-display);
-  font-size: 2.4rem;
-  font-weight: 900;
-  background: linear-gradient(135deg, var(--gold-bright), var(--gold-main), var(--blue-neon));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: 1px;
-}
-
-.splash-sub {
-  font-size: 0.85rem;
-  color: var(--blue-neon);
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  opacity: 0.8;
-}
-
-.splash-tagline {
-  font-size: 0.95rem;
-  color: var(--text-secondary);
-  text-align: center;
-  max-width: 280px;
-}
-
-.loading-bar {
-  width: 200px;
-  height: 3px;
-  background: var(--bg-card);
-  border-radius: var(--r-full);
-  overflow: hidden;
-  margin-top: var(--space-sm);
-}
-
-.loading-fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--gold-main), var(--blue-neon));
-  border-radius: var(--r-full);
-  animation: loadFill 1.8s ease forwards;
-}
-
-@keyframes loadFill {
-  0%   { width: 0%; }
-  60%  { width: 70%; }
-  100% { width: 100%; }
-}
-
-/* =============================================
-   APP LAYOUT
-   ============================================= */
-.app {
-  max-width: 480px;
-  margin: 0 auto;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  padding-bottom: 2rem;
-}
-
-/* =============================================
-   HEADER
-   ============================================= */
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-md) var(--space-lg);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: rgba(7, 9, 15, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.header-logo {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.logo-icon {
-  font-size: 1.8rem;
-  filter: drop-shadow(0 0 8px var(--gold-main));
-  animation: sunPulse 3s ease-in-out infinite;
-}
-
-.logo-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
-}
-
-.logo-main {
-  font-family: var(--font-display);
-  font-weight: 900;
-  font-size: 1.2rem;
-  background: linear-gradient(90deg, var(--gold-bright), var(--gold-main));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.logo-sub {
-  font-size: 0.65rem;
-  color: var(--blue-neon);
-  opacity: 0.75;
-  letter-spacing: 1.5px;
-}
-
-.header-badge {
-  background: var(--bg-card);
-  border: 1px solid var(--border-gold);
-  color: var(--gold-main);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 0.3rem 0.8rem;
-  border-radius: var(--r-full);
-}
-
-/* =============================================
-   STEPPER
-   ============================================= */
-.stepper-wrapper {
-  padding: var(--space-md) var(--space-lg);
-  background: var(--bg-base);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.stepper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: relative;
-}
-
-.step-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-  flex: 0 0 auto;
-}
-
-.step-circle {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-card);
-  border: 2px solid var(--border-main);
-  transition: all var(--t-slow);
-  position: relative;
-  overflow: hidden;
-}
-
-.step-num,
-.step-check {
-  position: absolute;
-  font-size: 0.85rem;
-  font-weight: 700;
-  transition: all var(--t-normal);
-}
-
-.step-check { opacity: 0; transform: scale(0); }
-
-.step-label {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  transition: color var(--t-normal);
-  font-weight: 500;
-}
-
-/* Active Step */
-.step-item.active .step-circle {
-  background: linear-gradient(135deg, var(--gold-dim), var(--gold-main));
-  border-color: var(--gold-bright);
-  box-shadow: 0 0 16px var(--gold-glow);
-}
-
-.step-item.active .step-num { color: #000; font-weight: 900; }
-.step-item.active .step-label { color: var(--gold-main); }
-
-/* Completed Step */
-.step-item.completed .step-circle {
-  background: linear-gradient(135deg, var(--green-main), #04a87e);
-  border-color: var(--green-main);
-  box-shadow: 0 0 12px var(--green-glow);
-}
-
-.step-item.completed .step-num { opacity: 0; transform: scale(0); }
-.step-item.completed .step-check { opacity: 1; transform: scale(1); color: #fff; }
-.step-item.completed .step-label { color: var(--green-main); }
-
-/* Step Lines */
-.step-line {
-  flex: 1;
-  height: 2px;
-  background: var(--border-subtle);
-  border-radius: var(--r-full);
-  margin: 0 0.3rem;
-  margin-bottom: 1.4rem;
-  position: relative;
-  overflow: hidden;
-  transition: background var(--t-slow);
-}
-
-.step-line::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, var(--green-main), var(--gold-main));
-  width: 0%;
-  transition: width 0.5s ease;
-}
-
-.step-line.active::after { width: 100%; }
-
-/* =============================================
-   STEPS CONTAINER & PANELS
-   ============================================= */
-.steps-container {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-
-.step-panel {
-  display: none;
-  padding: var(--space-lg);
-  animation: panelIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
-}
-
-.step-panel.active { display: block; }
-.step-panel.exit { display: block; animation: panelOut 0.3s ease both; }
-
-@keyframes panelIn {
-  from { opacity: 0; transform: translateX(-20px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes panelOut {
-  from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(20px); }
-}
-
-/* Step Intro */
-.step-intro {
-  margin-bottom: var(--space-lg);
-}
-
-.step-title {
-  font-family: var(--font-display);
-  font-size: 1.6rem;
-  font-weight: 900;
-  color: var(--text-primary);
-  margin-bottom: 0.3rem;
-  line-height: 1.3;
-}
-
-.step-desc {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-/* =============================================
-   STEP 1 — CITY CARDS
-   ============================================= */
-.city-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-md);
-  margin-bottom: var(--space-lg);
-}
-
-.city-card {
-  background: var(--bg-card);
-  border: 2px solid var(--border-main);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  cursor: pointer;
-  transition: all var(--t-slow);
-  position: relative;
-}
-
-.city-card:active { transform: scale(0.97); }
-
-.city-card-top {
-  height: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  background: var(--bg-surface);
-  overflow: hidden;
-}
-
-.city-emoji {
-  font-size: 2.5rem;
-  position: relative;
-  z-index: 2;
-  transition: transform var(--t-slow);
-}
-
-.city-glow {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity var(--t-slow);
-}
-
-.aden-glow {
-  background: radial-gradient(ellipse, rgba(255, 100, 50, 0.3), transparent 70%);
-}
-
-.dhale-glow {
-  background: radial-gradient(ellipse, rgba(100, 200, 100, 0.25), transparent 70%);
-}
-
-.city-card-body {
-  padding: var(--space-md);
-}
-
-.city-card-body h3 {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  font-weight: 900;
-  color: var(--text-primary);
-  margin-bottom: 0.2rem;
-}
-
-.city-desc-text {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-bottom: var(--space-sm);
-}
-
-.city-specs {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.city-spec {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-}
-
-.city-spec .spec-icon { font-size: 0.85rem; }
-.city-spec.warn { color: var(--gold-main); }
-.city-spec.tip  { color: var(--blue-neon); }
-
-.city-select-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem var(--space-md);
-  background: var(--bg-surface);
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  border-top: 1px solid var(--border-subtle);
-  transition: all var(--t-normal);
-}
-
-.check-circle {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--border-subtle);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  transition: all var(--t-normal);
-  opacity: 0;
-}
-
-/* Selected City Card */
-.city-card.selected {
-  border-color: var(--gold-main);
-  box-shadow: var(--shadow-gold);
-}
-
-.city-card.selected .city-glow { opacity: 1; }
-.city-card.selected .city-emoji { transform: scale(1.1); }
-.city-card.selected .city-select-indicator {
-  background: var(--gold-trace);
-  color: var(--gold-main);
-  border-top-color: var(--border-gold);
-}
-.city-card.selected .check-circle {
-  background: var(--gold-main);
-  color: #000;
-  opacity: 1;
-}
-
-/* Info Banner */
-.info-banner {
-  background: var(--bg-card);
-  border: 1px solid var(--border-gold);
-  border-radius: var(--r-md);
-  padding: var(--space-md);
-  margin-bottom: var(--space-lg);
-  font-size: 0.85rem;
-  color: var(--gold-main);
-  line-height: 1.6;
-  animation: panelIn 0.3s ease both;
-}
-
-/* =============================================
-   STEP 2 — APPLIANCES
-   ============================================= */
-.live-summary {
-  display: flex;
-  align-items: center;
-  background: var(--bg-card);
-  border: 1px solid var(--border-blue);
-  border-radius: var(--r-md);
-  padding: var(--space-sm) var(--space-md);
-  margin-bottom: var(--space-lg);
-  gap: var(--space-sm);
-}
-
-.summary-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-.sum-label {
-  font-size: 0.62rem;
-  color: var(--text-muted);
-  margin-bottom: 0.2rem;
-}
-
-.sum-val {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--blue-neon);
-  transition: all 0.3s ease;
-}
-
-.summary-divider {
-  width: 1px;
-  height: 30px;
-  background: var(--border-subtle);
-}
-
-/* Appliance Category */
-.appliance-category-group {
-  margin-bottom: var(--space-lg);
-}
-
-.category-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin-bottom: var(--space-sm);
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-.category-label::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border-subtle);
-  margin-right: var(--space-sm);
-}
-
-/* Appliance Item */
-.appliance-item {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-md);
-  margin-bottom: var(--space-sm);
-  overflow: hidden;
-  transition: all var(--t-normal);
-}
-
-.appliance-item.active {
-  border-color: var(--border-gold);
-  background: var(--bg-card-hover);
-  box-shadow: 0 0 12px rgba(245,166,35,0.08);
-}
-
-.appliance-header {
-  display: flex;
-  align-items: center;
-  padding: var(--space-md);
-  gap: var(--space-md);
-  cursor: pointer;
-  user-select: none;
-}
-
-.appliance-emoji {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-surface);
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border-subtle);
-  transition: all var(--t-normal);
-}
-
-.appliance-item.active .appliance-emoji {
-  background: var(--gold-trace);
-  border-color: var(--border-gold);
-}
-
-.appliance-info {
-  flex: 1;
-}
-
-.appliance-name {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 0.15rem;
-}
-
-.appliance-watt {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.appliance-watt .surge-tag {
-  color: var(--red-main);
-  font-size: 0.65rem;
-  background: var(--red-glow);
-  padding: 0.1rem 0.4rem;
-  border-radius: var(--r-full);
-  margin-right: 0.3rem;
-}
-
-/* Counter Controls */
-.appliance-counter {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-shrink: 0;
-}
-
-.counter-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  font-size: 1.1rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border-main);
-  transition: all var(--t-fast);
-  line-height: 1;
-}
-
-.counter-btn:active { transform: scale(0.9); }
-.counter-btn.plus { color: var(--gold-main); border-color: var(--border-gold); }
-.counter-btn.minus { color: var(--red-main); }
-
-.counter-val {
-  min-width: 28px;
-  text-align: center;
-  font-size: 1.1rem;
-  font-weight: 900;
-  color: var(--text-primary);
-}
-
-/* Appliance Hours Expand */
-.appliance-hours {
-  display: none;
-  padding: 0 var(--space-md) var(--space-md);
-  border-top: 1px solid var(--border-subtle);
-}
-
-.appliance-item.active .appliance-hours { display: block; }
-
-.hours-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
-}
-
-.hours-input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.hours-label {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.hours-label .label-icon { margin-left: 0.3rem; }
-
-.hours-slider-wrap {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.hours-slider {
-  flex: 1;
-  -webkit-appearance: none;
-  height: 4px;
-  background: var(--bg-surface);
-  border-radius: var(--r-full);
-  cursor: pointer;
-}
-
-.hours-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--gold-main);
-  box-shadow: 0 0 8px var(--gold-glow);
-  transition: all var(--t-fast);
-}
-
-.hours-slider.night::-webkit-slider-thumb {
-  background: var(--blue-neon);
-  box-shadow: 0 0 8px var(--blue-glow);
-}
-
-.hours-val-display {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--gold-main);
-  min-width: 30px;
-  text-align: center;
-}
-
-.hours-val-display.night { color: var(--blue-neon); }
-
-.wh-preview {
-  margin-top: var(--space-sm);
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  background: var(--bg-surface);
-  padding: 0.4rem 0.7rem;
-  border-radius: var(--r-sm);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.wh-preview span:last-child {
-  color: var(--green-main);
-  font-weight: 700;
-}
-
-/* =============================================
-   STEP 3 — WIRING
-   ============================================= */
-.input-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-lg);
-  padding: var(--space-lg);
-  margin-bottom: var(--space-md);
-  transition: border-color var(--t-normal);
-}
-
-.input-card:focus-within { border-color: var(--border-gold); }
-
-.input-card-header {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-md);
-  margin-bottom: var(--space-md);
-}
-
-.input-icon {
-  font-size: 1.6rem;
-  flex-shrink: 0;
-}
-
-.input-card-header h4 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 0.2rem;
-}
-
-.input-card-header p {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-}
-
-/* Distance Input */
-.distance-input-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.num-input-group {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-md);
-}
-
-.num-btn {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  font-size: 1.4rem;
-  font-weight: 700;
-  border: 2px solid var(--border-main);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--t-fast);
-  flex-shrink: 0;
-  line-height: 1;
-}
-
-.num-btn:active {
-  transform: scale(0.9);
-  background: var(--gold-trace);
-  border-color: var(--border-gold);
-}
-
-.num-display {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-}
-
-.num-display input {
-  background: transparent;
-  color: var(--gold-bright);
-  font-family: var(--font-display);
-  font-size: 2.5rem;
-  font-weight: 900;
-  width: 80px;
-  text-align: center;
-  -moz-appearance: textfield;
-}
-
-.num-display input::-webkit-outer-spin-button,
-.num-display input::-webkit-inner-spin-button { display: none; }
-
-.num-unit {
-  font-size: 1rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.distance-presets {
-  display: flex;
-  gap: var(--space-xs);
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.preset-btn {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-main);
-  color: var(--text-secondary);
-  padding: 0.4rem 0.8rem;
-  border-radius: var(--r-full);
-  font-size: 0.8rem;
-  font-family: var(--font-primary);
-  transition: all var(--t-fast);
-}
-
-.preset-btn:active,
-.preset-btn.active {
-  background: var(--gold-trace);
-  border-color: var(--border-gold);
-  color: var(--gold-main);
-}
-
-.wire-preview {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-sm);
-  padding: var(--space-sm) var(--space-md);
-  font-size: 0.8rem;
-  color: var(--blue-neon);
-  transition: all var(--t-normal);
-}
-
-/* Voltage Selector */
-.voltage-selector {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-sm);
-}
-
-.volt-option {
-  background: var(--bg-surface);
-  border: 2px solid var(--border-subtle);
-  border-radius: var(--r-md);
-  padding: var(--space-sm) var(--space-xs);
-  text-align: center;
-  cursor: pointer;
-  transition: all var(--t-normal);
-  position: relative;
-  overflow: hidden;
-}
-
-.volt-option:active { transform: scale(0.97); }
-
-.volt-option.selected {
-  background: var(--gold-trace);
-  border-color: var(--gold-main);
-}
-
-.volt-val {
-  font-family: var(--font-display);
-  font-size: 1.3rem;
-  font-weight: 900;
-  color: var(--text-secondary);
-  transition: color var(--t-normal);
-}
-
-.volt-option.selected .volt-val { color: var(--gold-bright); }
-
-.volt-label {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  font-weight: 600;
-  margin-top: 0.2rem;
-}
-
-.volt-desc {
-  font-size: 0.58rem;
-  color: var(--text-muted);
-  margin-top: 0.1rem;
-}
-
-.recommended-tag {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  background: var(--gold-main);
-  color: #000;
-  font-size: 0.5rem;
-  font-weight: 900;
-  padding: 0.15rem 0.35rem;
-  border-radius: var(--r-full);
-  line-height: 1.2;
-}
-
-/* Autonomy Selector */
-.autonomy-selector {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-sm);
-}
-
-.auto-option {
-  background: var(--bg-surface);
-  border: 2px solid var(--border-subtle);
-  border-radius: var(--r-md);
-  padding: var(--space-md) var(--space-xs);
-  text-align: center;
-  cursor: pointer;
-  transition: all var(--t-normal);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-}
-
-.auto-option:active { transform: scale(0.97); }
-
-.auto-option.selected {
-  background: var(--blue-trace);
-  border-color: var(--blue-neon);
-}
-
-.auto-num {
-  font-family: var(--font-display);
-  font-size: 1.6rem;
-  font-weight: 900;
-  color: var(--text-secondary);
-  transition: color var(--t-normal);
-  line-height: 1;
-}
-
-.auto-option.selected .auto-num { color: var(--blue-neon); }
-
-.auto-label {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.auto-desc {
-  font-size: 0.6rem;
-  color: var(--text-muted);
-}
-
-.auto-option.selected .auto-desc { color: var(--blue-neon); }
-
-/* =============================================
-   NAVIGATION BUTTONS
-   ============================================= */
-.nav-row {
-  display: flex;
-  gap: var(--space-md);
-  margin-top: var(--space-xl);
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--border-subtle);
-}
-
-.nav-row.single {
-  justify-content: flex-start;
-}
-
-.btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-sm);
-  padding: 0.85rem 1.5rem;
-  border-radius: var(--r-full);
-  font-size: 0.95rem;
-  font-weight: 700;
-  font-family: var(--font-primary);
-  transition: all var(--t-normal);
-  position: relative;
-  overflow: hidden;
-  user-select: none;
-  min-height: 50px;
-}
-
-.btn:active { transform: scale(0.96); }
-
-.btn.full-width { width: 100%; }
-
-.btn-primary {
-  flex: 1;
-  background: linear-gradient(135deg, var(--gold-dim), var(--gold-main));
-  color: #000;
-  box-shadow: 0 4px 16px var(--gold-glow);
-}
-
-.btn-primary:hover { box-shadow: 0 6px 24px rgba(245,166,35,0.4); }
-.btn-primary:disabled {
-  background: var(--bg-surface);
-  color: var(--text-muted);
-  box-shadow: none;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: var(--bg-card);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-main);
-  padding-right: var(--space-lg);
-  padding-left: var(--space-lg);
-}
-
-.btn-secondary:hover { border-color: var(--border-gold); color: var(--gold-main); }
-
-.btn-calculate {
-  flex: 1;
-  background: linear-gradient(135deg, #0055aa, var(--blue-main), var(--blue-neon));
-  color: #fff;
-  box-shadow: 0 4px 16px var(--blue-glow);
-  font-size: 1rem;
-}
-
-.btn-calculate:hover { box-shadow: 0 6px 24px rgba(0,212,255,0.4); }
-
-.calc-icon { font-size: 1.1rem; }
-
-.btn-arrow      { margin-right: auto; }
-.btn-arrow-back { margin-left: auto; }
-
-/* =============================================
-   STEP 4 — RESULTS
-   ============================================= */
-.results-intro {
-  text-align: center;
-}
-
-.results-star { font-style: normal; }
-
-.results-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-md);
-}
-
-.result-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  transition: all var(--t-slow);
-  animation: cardReveal 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-.result-card.full-width {
-  grid-column: 1 / -1;
-}
-
-@keyframes cardReveal {
-  from { opacity: 0; transform: translateY(20px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.result-card:nth-child(1) { animation-delay: 0.05s; }
-.result-card:nth-child(2) { animation-delay: 0.10s; }
-.result-card:nth-child(3) { animation-delay: 0.15s; }
-.result-card:nth-child(4) { animation-delay: 0.20s; }
-.result-card:nth-child(5) { animation-delay: 0.25s; }
-.result-card:nth-child(6) { animation-delay: 0.30s; }
-.result-card:nth-child(7) { animation-delay: 0.35s; }
-.result-card:nth-child(8) { animation-delay: 0.40s; }
-
-.rc-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-md);
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
-}
-
-.rc-icon { font-size: 1.2rem; }
-
-.rc-header h3 {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-}
-
-.rc-body {
-  padding: var(--space-md);
-}
-
-.main-metric {
-  margin-bottom: var(--space-sm);
-}
-
-.metric-val {
-  font-family: var(--font-display);
-  font-size: 1.8rem;
-  font-weight: 900;
-  color: var(--gold-bright);
-  display: block;
-  line-height: 1.1;
-}
-
-/* Full-width consumption card gets bigger number */
-.full-width .metric-val { font-size: 2.2rem; }
-
-.metric-unit {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.sub-metrics {
-  display: flex;
-  gap: var(--space-md);
-  margin-top: var(--space-sm);
-  flex-wrap: wrap;
-}
-
-.sub-m {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.sub-label {
-  font-size: 0.62rem;
-  color: var(--text-muted);
-}
-
-.sub-val {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--blue-neon);
-}
-
-.rc-detail {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin-top: var(--space-xs);
-}
-
-.rc-tip {
-  margin-top: var(--space-sm);
-  font-size: 0.72rem;
-  color: var(--green-main);
-  background: rgba(6,214,160,0.08);
-  border: 1px solid rgba(6,214,160,0.2);
-  border-radius: var(--r-sm);
-  padding: 0.4rem 0.6rem;
-  line-height: 1.4;
-}
-
-/* Expert Tips */
-.tips-card .rc-body { padding: var(--space-md) var(--space-lg); }
-
-.tips-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.tips-list li {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-sm);
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  padding: var(--space-sm);
-  background: var(--bg-surface);
-  border-radius: var(--r-sm);
-  border-right: 3px solid var(--gold-main);
-  line-height: 1.5;
-}
-
-.tips-list li .tip-icon {
-  font-size: 1rem;
-  flex-shrink: 0;
-}
-
-/* Share Card */
-.share-card .rc-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.share-text-box {
-  background: var(--bg-deep);
-  border: 1px solid var(--border-main);
-  border-radius: var(--r-md);
-  padding: var(--space-md);
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  line-height: 1.8;
-  direction: rtl;
-  text-align: right;
-  white-space: pre-wrap;
-  font-family: var(--font-primary);
-  max-height: 180px;
-  overflow-y: auto;
-}
-
-.share-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-sm);
-}
-
-.btn-whatsapp {
-  background: linear-gradient(135deg, #128C7E, #25D366);
-  color: #fff;
-  border-radius: var(--r-full);
-  padding: 0.8rem 1rem;
-  font-weight: 700;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  transition: all var(--t-normal);
-}
-
-.btn-whatsapp:active { transform: scale(0.96); }
-
-.btn-copy {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-main);
-  color: var(--text-secondary);
-  border-radius: var(--r-full);
-  padding: 0.8rem 1rem;
-  font-weight: 700;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  transition: all var(--t-normal);
-}
-
-.btn-copy:active { transform: scale(0.96); }
-.btn-copy.copied { border-color: var(--green-main); color: var(--green-main); }
-
-/* =============================================
-   TOAST NOTIFICATION
-   ============================================= */
-.toast {
-  position: fixed;
-  bottom: 30px;
-  left: 50%;
-  transform: translateX(-50%) translateY(80px);
-  background: var(--bg-card);
-  color: var(--text-primary);
-  padding: 0.75rem 1.5rem;
-  border-radius: var(--r-full);
-  font-size: 0.85rem;
-  font-weight: 600;
-  border: 1px solid var(--border-gold);
-  box-shadow: var(--shadow-gold);
-  z-index: 9999;
-  opacity: 0;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-/* =============================================
-   SCROLLBAR STYLING
-   ============================================= */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: var(--bg-base); }
-::-webkit-scrollbar-thumb { background: var(--border-main); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
-
-/* =============================================
-   UTILITY CLASSES
-   ============================================= */
-.text-gold   { color: var(--gold-main); }
-.text-blue   { color: var(--blue-neon); }
-.text-green  { color: var(--green-main); }
-.text-red    { color: var(--red-main); }
-.text-muted  { color: var(--text-muted); }
-
-/* =============================================
-   RESPONSIVE — ensure readability on very small screens
-   ============================================= */
-@media (max-width: 360px) {
-  .city-grid { grid-template-columns: 1fr; }
-  .results-grid { grid-template-columns: 1fr; }
-  .step-title { font-size: 1.35rem; }
-  .metric-val { font-size: 1.5rem; }
-  .full-width .metric-val { font-size: 1.8rem; }
-}
-
-@media (min-width: 481px) {
-  .app { border-right: 1px solid var(--border-subtle); border-left: 1px solid var(--border-subtle); }
-}
-
