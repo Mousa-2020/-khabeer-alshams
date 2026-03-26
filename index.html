@@ -2,478 +2,335 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <meta name="theme-color" content="#0a0c12" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>خبير الشمس | Yemen Solar Expert</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=Cairo:wght@600;700;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- شاشة البداية -->
+  <!-- ==============================
+       شاشة البداية SPLASH SCREEN
+       الكلاس: .splash (ظاهرة)
+       عند الاخفاء: نضيف .hidden
+  ============================== -->
   <div class="splash" id="splash">
     <div class="splash-inner">
-      <div class="sun-burst">
-        <div class="sun-core">&#9728;</div>
-        <div class="ray r1"></div><div class="ray r2"></div>
-        <div class="ray r3"></div><div class="ray r4"></div>
-        <div class="ray r5"></div><div class="ray r6"></div>
-        <div class="ray r7"></div><div class="ray r8"></div>
-      </div>
+      <div class="sun-icon">&#9728;</div>
       <h1 class="splash-title">خبير الشمس</h1>
-      <p class="splash-sub">Yemen Solar Expert</p>
+      <p class="splash-subtitle">Yemen Solar Expert</p>
       <p class="splash-tagline">مستشارك الهندسي الذكي لمنظومة طاقة تدوم طويلاً</p>
-      <div class="loading-bar"><div class="loading-fill"></div></div>
+      <div class="splash-bar"><div class="splash-bar-fill" id="splashBarFill"></div></div>
     </div>
   </div>
 
-  <!-- التطبيق الرئيسي -->
-  <div class="app" id="app" style="display:none;">
+  <!-- ==============================
+       الحاوية الرئيسية MAIN APP
+       الكلاس: .app-container .hidden (مخفية في البداية)
+       عند الاظهار: يُزال .hidden
+  ============================== -->
+  <div class="app-container hidden" id="appContainer">
 
     <!-- الهيدر -->
-    <header class="header">
+    <header class="app-header">
       <div class="header-logo">
-        <span class="logo-icon">&#9728;</span>
-        <div class="logo-text">
-          <span class="logo-main">خبير الشمس</span>
-          <span class="logo-sub">Yemen Solar Expert</span>
+        <span class="header-sun">&#9728;</span>
+        <div>
+          <div class="header-title">خبير الشمس</div>
+          <div class="header-sub">Yemen Solar Expert</div>
         </div>
       </div>
-      <div class="header-badge" id="cityBadge" style="display:none;"></div>
+      <div class="city-badge hidden" id="cityBadge"></div>
     </header>
 
     <!-- مؤشر الخطوات -->
-    <div class="stepper-wrapper">
-      <div class="stepper">
-        <div class="step-item active" id="stepItem1">
-          <div class="step-circle">
-            <span class="step-num">1</span>
-            <span class="step-check">&#10003;</span>
-          </div>
-          <span class="step-label">المنطقة</span>
-        </div>
-        <div class="step-line" id="line12"></div>
-        <div class="step-item" id="stepItem2">
-          <div class="step-circle">
-            <span class="step-num">2</span>
-            <span class="step-check">&#10003;</span>
-          </div>
-          <span class="step-label">الأجهزة</span>
-        </div>
-        <div class="step-line" id="line23"></div>
-        <div class="step-item" id="stepItem3">
-          <div class="step-circle">
-            <span class="step-num">3</span>
-            <span class="step-check">&#10003;</span>
-          </div>
-          <span class="step-label">التوصيل</span>
-        </div>
-        <div class="step-line" id="line34"></div>
-        <div class="step-item" id="stepItem4">
-          <div class="step-circle">
-            <span class="step-num">4</span>
-            <span class="step-check">&#9889;</span>
-          </div>
-          <span class="step-label">الروشتة</span>
-        </div>
+    <div class="stepper-bar">
+      <div class="step-dot active" id="dot1">
+        <div class="dot-circle"><span class="dot-num">1</span><span class="dot-check">&#10003;</span></div>
+        <div class="dot-label">المنطقة</div>
+      </div>
+      <div class="step-connector" id="conn12"></div>
+      <div class="step-dot" id="dot2">
+        <div class="dot-circle"><span class="dot-num">2</span><span class="dot-check">&#10003;</span></div>
+        <div class="dot-label">الاجهزة</div>
+      </div>
+      <div class="step-connector" id="conn23"></div>
+      <div class="step-dot" id="dot3">
+        <div class="dot-circle"><span class="dot-num">3</span><span class="dot-check">&#10003;</span></div>
+        <div class="dot-label">التوصيل</div>
+      </div>
+      <div class="step-connector" id="conn34"></div>
+      <div class="step-dot" id="dot4">
+        <div class="dot-circle"><span class="dot-num">4</span><span class="dot-check">&#9889;</span></div>
+        <div class="dot-label">الروشتة</div>
       </div>
     </div>
 
-    <!-- حاوية الخطوات -->
-    <div class="steps-container">
+    <!-- ======== الخطوات ======== -->
+    <div class="steps-wrap">
 
-      <!-- الخطوة 1: اختيار المدينة -->
-      <section class="step-panel active" id="panel1">
-        <div class="step-intro">
-          <h2 class="step-title">أين تسكن؟</h2>
-          <p class="step-desc">تختلف حسابات المنظومة حسب المنطقة الجغرافية والمناخ</p>
-        </div>
+      <!-- الخطوة 1: المدينة -->
+      <div class="step-panel active" id="panel1">
+        <h2 class="step-heading">اين تسكن؟</h2>
+        <p class="step-hint">تختلف الحسابات حسب المنطقة الجغرافية والمناخ</p>
 
-        <div class="city-grid">
-          <div class="city-card" data-city="aden" onclick="selectCity(this)">
-            <div class="city-card-top">
-              <span class="city-emoji">&#127754;</span>
-              <div class="city-glow aden-glow"></div>
+        <div class="cities-row">
+
+          <div class="city-card" id="cardAden" data-city="aden" onclick="pickCity(this)">
+            <div class="city-top aden-top">
+              <span class="city-big-icon">&#127754;</span>
             </div>
-            <div class="city-card-body">
+            <div class="city-body">
               <h3>عدن</h3>
-              <p class="city-desc-text">ساحلية &bull; حرارة شديدة صيفاً</p>
-              <div class="city-specs">
-                <div class="city-spec">
-                  <span class="spec-icon">&#127777;</span>
-                  <span>درجة حرارة عالية</span>
-                </div>
-                <div class="city-spec">
-                  <span class="spec-icon">&#9728;</span>
-                  <span>5.5 ساعة شمس فعّالة</span>
-                </div>
-                <div class="city-spec warn">
-                  <span class="spec-icon">&#9888;</span>
-                  <span>+15% هامش أمان للبطاريات</span>
-                </div>
-              </div>
+              <p class="city-meta">ساحلية - حرارة شديدة صيفاً</p>
+              <ul class="city-facts">
+                <li>&#9728; 5.5 ساعة شمس فعالة / يوم</li>
+                <li class="fact-warn">&#9888; +15% هامش امان للبطاريات</li>
+              </ul>
             </div>
-            <div class="city-select-indicator">
-              <span>اختر عدن</span>
-              <span class="check-circle">&#10003;</span>
-            </div>
+            <div class="city-footer" id="footerAden">اختر عدن</div>
           </div>
 
-          <div class="city-card" data-city="dhale" onclick="selectCity(this)">
-            <div class="city-card-top">
-              <span class="city-emoji">&#9968;</span>
-              <div class="city-glow dhale-glow"></div>
+          <div class="city-card" id="cardDhale" data-city="dhale" onclick="pickCity(this)">
+            <div class="city-top dhale-top">
+              <span class="city-big-icon">&#9968;</span>
             </div>
-            <div class="city-card-body">
+            <div class="city-body">
               <h3>الضالع</h3>
-              <p class="city-desc-text">مرتفعات &bull; جو معتدل نسبياً</p>
-              <div class="city-specs">
-                <div class="city-spec">
-                  <span class="spec-icon">&#127780;</span>
-                  <span>جو معتدل في الغالب</span>
-                </div>
-                <div class="city-spec">
-                  <span class="spec-icon">&#9728;</span>
-                  <span>5.0 ساعة شمس فعّالة</span>
-                </div>
-                <div class="city-spec tip">
-                  <span class="spec-icon">&#128208;</span>
-                  <span>زاوية ميل مثالية 30 درجة</span>
-                </div>
-              </div>
+              <p class="city-meta">مرتفعات - جو معتدل</p>
+              <ul class="city-facts">
+                <li>&#9728; 5.0 ساعة شمس فعالة / يوم</li>
+                <li class="fact-tip">&#128208; زاوية ميل مثالية 30 درجة</li>
+              </ul>
             </div>
-            <div class="city-select-indicator">
-              <span>اختر الضالع</span>
-              <span class="check-circle">&#10003;</span>
-            </div>
+            <div class="city-footer" id="footerDhale">اختر الضالع</div>
           </div>
+
         </div>
 
-        <div class="info-banner" id="cityInfoBanner" style="display:none;"></div>
-
-        <div class="nav-row single">
-          <button class="btn btn-primary" id="btnNext1" onclick="goToStep(2)" disabled>
-            <span>التالي</span>
-            <span class="btn-arrow">&#8592;</span>
-          </button>
-        </div>
-      </section>
-
-      <!-- الخطوة 2: الأجهزة -->
-      <section class="step-panel" id="panel2">
-        <div class="step-intro">
-          <h2 class="step-title">أجهزتك الكهربائية</h2>
-          <p class="step-desc">حدد الأجهزة المطلوبة وعدد ساعات تشغيلها</p>
-        </div>
-
-        <div class="live-summary" id="liveSummary">
-          <div class="summary-item">
-            <span class="sum-label">الأجهزة</span>
-            <span class="sum-val" id="sumDevices">0</span>
-          </div>
-          <div class="summary-divider"></div>
-          <div class="summary-item">
-            <span class="sum-label">الاستهلاك اليومي</span>
-            <span class="sum-val" id="sumWh">0 Wh</span>
-          </div>
-          <div class="summary-divider"></div>
-          <div class="summary-item">
-            <span class="sum-label">الحمل الأقصى</span>
-            <span class="sum-val" id="sumWatts">0 W</span>
-          </div>
-        </div>
-
-        <div class="appliances-container" id="appliancesContainer">
-          <!-- تُنشأ تلقائياً بواسطة script.js -->
-        </div>
+        <div class="info-box hidden" id="cityInfoBox"></div>
 
         <div class="nav-row">
-          <button class="btn btn-secondary" onclick="goToStep(1)">
-            <span class="btn-arrow-back">&#8594;</span>
-            <span>رجوع</span>
-          </button>
-          <button class="btn btn-primary" id="btnNext2" onclick="goToStep(3)">
-            <span>التالي</span>
-            <span class="btn-arrow">&#8592;</span>
+          <button class="btn btn-gold" id="btnStep1Next" onclick="goStep(2)" disabled>
+            التالي &#8592;
           </button>
         </div>
-      </section>
+      </div>
+
+      <!-- الخطوة 2: الاجهزة -->
+      <div class="step-panel" id="panel2">
+        <h2 class="step-heading">اجهزتك الكهربائية</h2>
+        <p class="step-hint">اختر الاجهزة وحدد ساعات تشغيلها نهاراً وليلاً</p>
+
+        <!-- شريط الملخص الحي -->
+        <div class="live-bar">
+          <div class="lb-item">
+            <div class="lb-label">الاجهزة المختارة</div>
+            <div class="lb-val" id="lbDevices">0</div>
+          </div>
+          <div class="lb-sep"></div>
+          <div class="lb-item">
+            <div class="lb-label">الاستهلاك اليومي</div>
+            <div class="lb-val" id="lbWh">0 Wh</div>
+          </div>
+          <div class="lb-sep"></div>
+          <div class="lb-item">
+            <div class="lb-label">الحمل الاقصى</div>
+            <div class="lb-val" id="lbPeak">0 W</div>
+          </div>
+        </div>
+
+        <!-- قائمة الاجهزة (تنشأ بواسطة JS) -->
+        <div id="devicesList"></div>
+
+        <div class="nav-row two">
+          <button class="btn btn-outline" onclick="goStep(1)">&#8594; رجوع</button>
+          <button class="btn btn-gold" onclick="goStep(3)">التالي &#8592;</button>
+        </div>
+      </div>
 
       <!-- الخطوة 3: التوصيل -->
-      <section class="step-panel" id="panel3">
-        <div class="step-intro">
-          <h2 class="step-title">بيانات التوصيل</h2>
-          <p class="step-desc">لحساب سُمك الأسلاك ومنع هبوط الجهد</p>
-        </div>
+      <div class="step-panel" id="panel3">
+        <h2 class="step-heading">بيانات التوصيل</h2>
+        <p class="step-hint">لحساب سُمك الاسلاك ومنع هبوط الجهد</p>
 
         <!-- المسافة -->
-        <div class="input-card">
-          <div class="input-card-header">
-            <span class="input-icon">&#128207;</span>
-            <div>
-              <h4>المسافة بين الألواح والبطاريات</h4>
-              <p>أدخل طول الكيبل بالأمتار</p>
+        <div class="input-box">
+          <div class="input-box-title">&#128207; المسافة بين الالواح والبطاريات</div>
+          <div class="input-box-hint">ادخل طول الكيبل بالامتار</div>
+          <div class="distance-ctrl">
+            <button class="ctrl-btn" onclick="chgDist(-1)">&#8722;</button>
+            <div class="dist-val-wrap">
+              <input type="number" id="distInput" value="5" min="1" max="100" oninput="onDistInput()" />
+              <span class="dist-unit">متر</span>
             </div>
+            <button class="ctrl-btn" onclick="chgDist(1)">+</button>
           </div>
-          <div class="distance-input-wrap">
-            <div class="num-input-group">
-              <button class="num-btn" onclick="changeDistance(-1)">&#8722;</button>
-              <div class="num-display">
-                <input type="number" id="wireDistance" value="5" min="1" max="100" oninput="updateWirePreview()" />
-                <span class="num-unit">متر</span>
-              </div>
-              <button class="num-btn" onclick="changeDistance(1)">&#43;</button>
-            </div>
-            <div class="distance-presets">
-              <button class="preset-btn" onclick="setDistance(3)">3م</button>
-              <button class="preset-btn" onclick="setDistance(5)">5م</button>
-              <button class="preset-btn" onclick="setDistance(10)">10م</button>
-              <button class="preset-btn" onclick="setDistance(15)">15م</button>
-              <button class="preset-btn" onclick="setDistance(20)">20م</button>
-            </div>
+          <div class="preset-row">
+            <button class="preset" onclick="setDist(3)">3م</button>
+            <button class="preset" onclick="setDist(5)">5م</button>
+            <button class="preset" onclick="setDist(10)">10م</button>
+            <button class="preset" onclick="setDist(15)">15م</button>
+            <button class="preset" onclick="setDist(20)">20م</button>
           </div>
-          <div class="wire-preview" id="wirePreview">
-            <span>&#128268;</span>
-            <span id="wirePreviewText">أضف الأجهزة أولاً لرؤية التوصية</span>
-          </div>
+          <div class="wire-hint" id="wireHint">&#128268; اضف الاجهزة اولاً</div>
         </div>
 
         <!-- جهد المنظومة -->
-        <div class="input-card">
-          <div class="input-card-header">
-            <span class="input-icon">&#9889;</span>
-            <div>
-              <h4>جهد المنظومة</h4>
-              <p>يحدد حجم البطاريات والأسلاك</p>
+        <div class="input-box">
+          <div class="input-box-title">&#9889; جهد المنظومة</div>
+          <div class="input-box-hint">يحدد حجم البطاريات والاسلاك</div>
+          <div class="volt-row" id="voltRow">
+            <div class="volt-opt" data-v="12" onclick="pickVolt(this)">
+              <div class="volt-num">12V</div>
+              <div class="volt-desc">صغيرة &lt;500W</div>
             </div>
-          </div>
-          <div class="voltage-selector" id="voltageSelector">
-            <div class="volt-option" data-volt="12" onclick="selectVoltage(this)">
-              <div class="volt-val">12V</div>
-              <div class="volt-label">منظومات صغيرة</div>
-              <div class="volt-desc">أقل من 500W</div>
+            <div class="volt-opt selected" data-v="24" onclick="pickVolt(this)">
+              <div class="volt-num">24V</div>
+              <div class="volt-desc">متوسطة &#11088;</div>
+              <div class="volt-badge">موصى به</div>
             </div>
-            <div class="volt-option selected" data-volt="24" onclick="selectVoltage(this)">
-              <div class="volt-val">24V</div>
-              <div class="volt-label">منظومات متوسطة</div>
-              <div class="volt-desc">500 – 3000W</div>
-              <div class="recommended-tag">موصى به</div>
-            </div>
-            <div class="volt-option" data-volt="48" onclick="selectVoltage(this)">
-              <div class="volt-val">48V</div>
-              <div class="volt-label">منظومات كبيرة</div>
-              <div class="volt-desc">أكثر من 3000W</div>
+            <div class="volt-opt" data-v="48" onclick="pickVolt(this)">
+              <div class="volt-num">48V</div>
+              <div class="volt-desc">كبيرة &gt;3000W</div>
             </div>
           </div>
         </div>
 
-        <!-- أيام الاحتياط -->
-        <div class="input-card">
-          <div class="input-card-header">
-            <span class="input-icon">&#127769;</span>
-            <div>
-              <h4>أيام الاحتياط (الاستقلالية)</h4>
-              <p>كم يوماً تشتغل البطارية بدون شمس؟</p>
+        <!-- ايام الاحتياط -->
+        <div class="input-box">
+          <div class="input-box-title">&#127769; ايام الاحتياط</div>
+          <div class="input-box-hint">كم يوماً تعمل البطارية بدون شمس؟</div>
+          <div class="auto-row" id="autoRow">
+            <div class="auto-opt" data-d="1" onclick="pickAuto(this)">
+              <div class="auto-num">1</div>
+              <div class="auto-lbl">يوم - اقتصادي</div>
+            </div>
+            <div class="auto-opt selected" data-d="2" onclick="pickAuto(this)">
+              <div class="auto-num">2</div>
+              <div class="auto-lbl">يومان &#11088;</div>
+            </div>
+            <div class="auto-opt" data-d="3" onclick="pickAuto(this)">
+              <div class="auto-num">3</div>
+              <div class="auto-lbl">ايام - عالي</div>
             </div>
           </div>
-          <div class="autonomy-selector" id="autonomySelector">
-            <div class="auto-option" data-days="1" onclick="selectAutonomy(this)">
-              <span class="auto-num">1</span>
-              <span class="auto-label">يوم</span>
-              <span class="auto-desc">اقتصادي</span>
-            </div>
-            <div class="auto-option selected" data-days="2" onclick="selectAutonomy(this)">
-              <span class="auto-num">2</span>
-              <span class="auto-label">يومين</span>
-              <span class="auto-desc">موصى به &#11088;</span>
-            </div>
-            <div class="auto-option" data-days="3" onclick="selectAutonomy(this)">
-              <span class="auto-num">3</span>
-              <span class="auto-label">أيام</span>
-              <span class="auto-desc">أمان عالي</span>
+        </div>
+
+        <div class="nav-row two">
+          <button class="btn btn-outline" onclick="goStep(2)">&#8594; رجوع</button>
+          <button class="btn btn-blue" onclick="doCalc()">&#128300; احسب الروشتة</button>
+        </div>
+      </div>
+
+      <!-- الخطوة 4: النتائج -->
+      <div class="step-panel" id="panel4">
+        <h2 class="step-heading">&#9889; روشتتك التقنية</h2>
+        <p class="step-hint" id="resultCity"></p>
+
+        <div class="results-grid">
+
+          <div class="res-card wide">
+            <div class="res-head">&#128202; الاستهلاك اليومي</div>
+            <div class="res-body">
+              <div class="big-num" id="rTotalWh">—</div>
+              <div class="big-unit">وات-ساعة / يوم</div>
+              <div class="sub-row">
+                <div class="sub-item"><div class="sub-lbl">نهاراً</div><div class="sub-val" id="rDayWh">—</div></div>
+                <div class="sub-item"><div class="sub-lbl">ليلاً</div><div class="sub-val" id="rNightWh">—</div></div>
+                <div class="sub-item"><div class="sub-lbl">حمل فوري</div><div class="sub-val" id="rPeak">—</div></div>
+              </div>
             </div>
           </div>
+
+          <div class="res-card">
+            <div class="res-head">&#127774; الالواح الشمسية</div>
+            <div class="res-body">
+              <div class="big-num" id="rPanels">—</div>
+              <div class="big-unit">لوح شمسي</div>
+              <div class="res-detail" id="rPanelsD"></div>
+              <div class="res-tip" id="rPanelsTip"></div>
+            </div>
+          </div>
+
+          <div class="res-card">
+            <div class="res-head">&#128267; البطاريات</div>
+            <div class="res-body">
+              <div class="big-num" id="rBattAh">—</div>
+              <div class="big-unit">امبير-ساعة</div>
+              <div class="res-detail" id="rBattD"></div>
+              <div class="res-tip" id="rBattTip"></div>
+            </div>
+          </div>
+
+          <div class="res-card">
+            <div class="res-head">&#9881; المحول / الانفيرتر</div>
+            <div class="res-body">
+              <div class="big-num" id="rInv">—</div>
+              <div class="big-unit">VA</div>
+              <div class="res-detail" id="rInvD"></div>
+              <div class="res-tip" id="rInvTip"></div>
+            </div>
+          </div>
+
+          <div class="res-card">
+            <div class="res-head">&#128268; الاسلاك</div>
+            <div class="res-body">
+              <div class="big-num" id="rWire">—</div>
+              <div class="big-unit">mm² سُمك السلك</div>
+              <div class="res-detail" id="rWireD"></div>
+              <div class="res-tip" id="rWireTip"></div>
+            </div>
+          </div>
+
+          <div class="res-card">
+            <div class="res-head">&#127897; وحدة الشحن</div>
+            <div class="res-body">
+              <div class="big-num" id="rCC">—</div>
+              <div class="big-unit">امبير</div>
+              <div class="res-detail" id="rCCD"></div>
+              <div class="res-tip" id="rCCTip"></div>
+            </div>
+          </div>
+
+          <div class="res-card wide tips-card">
+            <div class="res-head">&#129504; نصائح الخبير</div>
+            <div class="res-body">
+              <ul class="tips-ul" id="tipsList"></ul>
+            </div>
+          </div>
+
+          <div class="res-card wide share-card">
+            <div class="res-head">&#128203; شارك الروشتة</div>
+            <div class="res-body">
+              <div class="share-txt" id="shareBox"></div>
+              <div class="share-btns">
+                <button class="btn btn-whatsapp" onclick="doWA()">&#128172; واتساب</button>
+                <button class="btn btn-copy" id="copyBtn" onclick="doCopy()">&#128203; نسخ</button>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <div class="nav-row">
-          <button class="btn btn-secondary" onclick="goToStep(2)">
-            <span class="btn-arrow-back">&#8594;</span>
-            <span>رجوع</span>
-          </button>
-          <button class="btn btn-calculate" onclick="calculateResults()">
-            <span>&#128300;</span>
-            <span>احسب الروشتة</span>
-          </button>
+          <button class="btn btn-outline full" onclick="doReset()">&#128260; منظومة جديدة</button>
         </div>
-      </section>
+      </div>
 
-      <!-- الخطوة 4: النتائج -->
-      <section class="step-panel" id="panel4">
-        <div class="step-intro results-intro">
-          <h2 class="step-title">&#9889; روشتتك التقنية &#9889;</h2>
-          <p class="step-desc" id="resultsSubtitle"></p>
-        </div>
+    </div><!-- end steps-wrap -->
+  </div><!-- end app-container -->
 
-        <div class="results-grid" id="resultsGrid">
+  <!-- Toast -->
+  <div class="toast-msg" id="toastMsg"></div>
 
-          <!-- الاستهلاك اليومي -->
-          <div class="result-card full-width" id="cardConsumption">
-            <div class="rc-header">
-              <span class="rc-icon">&#128202;</span>
-              <h3>الاستهلاك اليومي</h3>
-            </div>
-            <div class="rc-body">
-              <div class="main-metric">
-                <span class="metric-val" id="totalWh">—</span>
-                <span class="metric-unit">وات·ساعة / يوم</span>
-              </div>
-              <div class="sub-metrics">
-                <div class="sub-m">
-                  <span class="sub-label">نهاراً</span>
-                  <span class="sub-val" id="dayWh">—</span>
-                </div>
-                <div class="sub-m">
-                  <span class="sub-label">ليلاً</span>
-                  <span class="sub-val" id="nightWh">—</span>
-                </div>
-                <div class="sub-m">
-                  <span class="sub-label">الحمل الفوري</span>
-                  <span class="sub-val" id="peakLoad">—</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- الألواح -->
-          <div class="result-card" id="cardPanels">
-            <div class="rc-header">
-              <span class="rc-icon">&#127774;</span>
-              <h3>الألواح الشمسية</h3>
-            </div>
-            <div class="rc-body">
-              <div class="main-metric">
-                <span class="metric-val" id="panelCount">—</span>
-                <span class="metric-unit">لوح شمسي</span>
-              </div>
-              <div class="rc-detail" id="panelDetail"></div>
-              <div class="rc-tip" id="panelTip"></div>
-            </div>
-          </div>
-
-          <!-- البطاريات -->
-          <div class="result-card" id="cardBattery">
-            <div class="rc-header">
-              <span class="rc-icon">&#128267;</span>
-              <h3>البطاريات</h3>
-            </div>
-            <div class="rc-body">
-              <div class="main-metric">
-                <span class="metric-val" id="batteryAh">—</span>
-                <span class="metric-unit">أمبير·ساعة</span>
-              </div>
-              <div class="rc-detail" id="batteryDetail"></div>
-              <div class="rc-tip" id="batteryTip"></div>
-            </div>
-          </div>
-
-          <!-- المحول -->
-          <div class="result-card" id="cardInverter">
-            <div class="rc-header">
-              <span class="rc-icon">&#9881;</span>
-              <h3>المحول / الإنفيرتر</h3>
-            </div>
-            <div class="rc-body">
-              <div class="main-metric">
-                <span class="metric-val" id="inverterVA">—</span>
-                <span class="metric-unit">VA (فولت·أمبير)</span>
-              </div>
-              <div class="rc-detail" id="inverterDetail"></div>
-              <div class="rc-tip" id="inverterTip"></div>
-            </div>
-          </div>
-
-          <!-- الأسلاك -->
-          <div class="result-card" id="cardWire">
-            <div class="rc-header">
-              <span class="rc-icon">&#128268;</span>
-              <h3>الأسلاك والتوصيل</h3>
-            </div>
-            <div class="rc-body">
-              <div class="main-metric">
-                <span class="metric-val" id="wireMM">—</span>
-                <span class="metric-unit">مم² سُمك السلك</span>
-              </div>
-              <div class="rc-detail" id="wireDetail"></div>
-              <div class="rc-tip" id="wireTip"></div>
-            </div>
-          </div>
-
-          <!-- وحدة الشحن -->
-          <div class="result-card" id="cardCC">
-            <div class="rc-header">
-              <span class="rc-icon">&#127897;</span>
-              <h3>وحدة الشحن (Charge Controller)</h3>
-            </div>
-            <div class="rc-body">
-              <div class="main-metric">
-                <span class="metric-val" id="ccAmpere">—</span>
-                <span class="metric-unit">أمبير</span>
-              </div>
-              <div class="rc-detail" id="ccDetail"></div>
-              <div class="rc-tip" id="ccTip"></div>
-            </div>
-          </div>
-
-          <!-- نصائح الخبير -->
-          <div class="result-card full-width tips-card" id="cardTips">
-            <div class="rc-header">
-              <span class="rc-icon">&#129504;</span>
-              <h3>نصائح الخبير لمنظومتك</h3>
-            </div>
-            <div class="rc-body">
-              <ul class="tips-list" id="expertTipsList"></ul>
-            </div>
-          </div>
-
-          <!-- المشاركة -->
-          <div class="result-card full-width share-card" id="cardShare">
-            <div class="rc-header">
-              <span class="rc-icon">&#128203;</span>
-              <h3>شارك الروشتة</h3>
-            </div>
-            <div class="rc-body">
-              <div class="share-text-box" id="shareTextBox"></div>
-              <div class="share-buttons">
-                <button class="btn btn-whatsapp" onclick="shareWhatsApp()">
-                  <span>&#128172;</span>
-                  <span>واتساب</span>
-                </button>
-                <button class="btn btn-copy" onclick="copyToClipboard()" id="btnCopy">
-                  <span>&#128203;</span>
-                  <span>نسخ النص</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        <div class="nav-row single" style="margin-top:1rem;">
-          <button class="btn btn-secondary full-width" onclick="restartApp()">
-            <span>&#128260;</span>
-            <span>حساب منظومة جديدة</span>
-          </button>
-        </div>
-      </section>
-
-    </div><!-- نهاية steps-container -->
-  </div><!-- نهاية app -->
-
-  <!-- إشعار مؤقت -->
-  <div class="toast" id="toast"></div>
-
+  <!--
+    ============================================================
+    ربط ملف الجافا سكريبت قبل نهاية body مباشرةً
+    ============================================================
+  -->
   <script src="script.js"></script>
 </body>
 </html>
