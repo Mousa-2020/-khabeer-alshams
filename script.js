@@ -1,527 +1,565 @@
 /*
+  ================================================
   خبير الشمس | Yemen Solar Expert — script.js
-  =============================================
-  المعادلات الهندسية المستخدمة:
-    1. Wh/day  = Watts x Hours
-    2. Panels  = (Wh / PSH) x F_loss x F_temp
-    3. Battery = (Wh x Days) / (V x DoD x eff) x F_heat
-    4. Inverter= SurgeLoad x 1.25 / PF (PF=0.8)
-    5. Wire    = (2 x L x I x rho) / (V x 0.03)
-    6. CC      = (Wp / V) x 1.25
+  ================================================
+
+  المعادلات الهندسية:
+    1. استهلاك الجهاز   : Wh = W × h × qty
+    2. قوة الألواح      : P  = (Wh / PSH) × 1.25 × Ftemp
+    3. البطاريات        : Ah = (Wh × أيام) / (V × 0.5 × 0.85) × Fحرارة
+    4. المحول           : VA = SurgeLoad × 1.25 / 0.8
+    5. سُمك السلك       : A  = (2 × L × I × ρ) / (V × 0.03)
+    6. وحدة الشحن       : Icc = (Wp / V) × 1.25
 */
 
 'use strict';
 
-/* =============================================
-   قاعدة بيانات الاجهزة
-============================================= */
+/* ================================================
+   قاعدة بيانات الأجهزة
+   surge: مضاعف تيار البدء للأجهزة ذات المحركات
+   الثلاجات: duty cycle 40% (لا تعمل بشكل متواصل)
+   ================================================ */
 var DEVICES = [
-  { id:'led',     name:'لمبة LED',         icon:'&#128161;', w:10,  surge:1.0, motor:false, cat:'اضاءة'        },
-  { id:'strip',   name:'شريط LED',          icon:'&#10024;',  w:20,  surge:1.0, motor:false, cat:'اضاءة'        },
-  { id:'fan_c',   name:'مروحة سقف',         icon:'&#127744;', w:75,  surge:1.3, motor:true,  cat:'تبريد'        },
-  { id:'fan_t',   name:'مروحة طاولة',       icon:'&#128168;', w:45,  surge:1.3, motor:true,  cat:'تبريد'        },
-  { id:'tv',      name:'تلفزيون / شاشة',    icon:'&#128250;', w:80,  surge:1.0, motor:false, cat:'الكترونيات'   },
-  { id:'phone',   name:'شاحن جوال',         icon:'&#128242;', w:10,  surge:1.0, motor:false, cat:'الكترونيات'   },
-  { id:'laptop',  name:'لابتوب',            icon:'&#128187;', w:65,  surge:1.0, motor:false, cat:'الكترونيات'   },
-  { id:'router',  name:'راوتر انترنت',      icon:'&#128225;', w:15,  surge:1.0, motor:false, cat:'الكترونيات'   },
-  { id:'fridge_s',name:'ثلاجة صغيرة',      icon:'&#129704;', w:100, surge:3.0, motor:true,  cat:'منزلية'       },
-  { id:'fridge_l',name:'ثلاجة كبيرة',      icon:'&#127968;', w:150, surge:3.0, motor:true,  cat:'منزلية'       },
-  { id:'pump',    name:'مضخة مياه',         icon:'&#128167;', w:370, surge:3.0, motor:true,  cat:'منزلية'       },
-  { id:'washer',  name:'غسالة ملابس',       icon:'&#129399;', w:500, surge:2.0, motor:true,  cat:'منزلية'       },
-  { id:'blender', name:'خلاط / محضرة',      icon:'&#129379;', w:350, surge:2.0, motor:true,  cat:'مطبخ'         },
-  { id:'kettle',  name:'غلاية كهربائية',    icon:'&#9749;',   w:1000,surge:1.0, motor:false, cat:'مطبخ'         },
+  { id:'led',   name:'لمبة LED',          icon:'💡', w:10,   surge:1.0, fridge:false, cat:'إضاءة' },
+  { id:'strip', name:'شريط LED',           icon:'✨', w:20,   surge:1.0, fridge:false, cat:'إضاءة' },
+  { id:'fanC',  name:'مروحة سقف',          icon:'🌀', w:75,   surge:1.3, fridge:false, cat:'تبريد' },
+  { id:'fanT',  name:'مروحة طاولة',        icon:'💨', w:45,   surge:1.3, fridge:false, cat:'تبريد' },
+  { id:'tv',    name:'تلفزيون / شاشة',     icon:'📺', w:80,   surge:1.0, fridge:false, cat:'إلكترونيات' },
+  { id:'phone', name:'شاحن جوال',          icon:'📱', w:10,   surge:1.0, fridge:false, cat:'إلكترونيات' },
+  { id:'lap',   name:'لابتوب',             icon:'💻', w:65,   surge:1.0, fridge:false, cat:'إلكترونيات' },
+  { id:'rout',  name:'راوتر إنترنت',       icon:'📡', w:15,   surge:1.0, fridge:false, cat:'إلكترونيات' },
+  { id:'frS',   name:'ثلاجة صغيرة',        icon:'🧊', w:100,  surge:3.0, fridge:true,  cat:'منزلية' },
+  { id:'frL',   name:'ثلاجة كبيرة',        icon:'🏠', w:150,  surge:3.0, fridge:true,  cat:'منزلية' },
+  { id:'pump',  name:'مضخة مياه',          icon:'💧', w:370,  surge:3.0, fridge:false, cat:'منزلية' },
+  { id:'wash',  name:'غسالة ملابس',        icon:'🫧', w:500,  surge:2.0, fridge:false, cat:'منزلية' },
+  { id:'blend', name:'خلاط / محضرة',       icon:'🥤', w:350,  surge:2.0, fridge:false, cat:'مطبخ' },
+  { id:'kett',  name:'غلاية كهربائية',     icon:'☕', w:1000, surge:1.0, fridge:false, cat:'مطبخ' },
 ];
 
-/* =============================================
+/* ================================================
    بيانات المدن
-============================================= */
+   PSH  = Peak Sun Hours (ساعات الذروة الشمسية)
+   heat = معامل حرارة البطاريات (عدن +15%)
+   temp = معامل حرارة الألواح (عدن +10%)
+   ================================================ */
 var CITIES = {
   aden: {
-    name:          'عدن',
-    psh:           5.5,
-    heatFactor:    1.15,
-    tempFactor:    1.10,
-    infoText:      'عدن — حرارة شديدة تؤثر على البطاريات والالواح. تم اضافة هامش امان 15% على سعة البطاريات تعويضاً عن الحرارة. يُنصح بتهوية جيدة لمنع غليان البطاريات.',
-    tiltTip:       'وجّه الالواح نحو الجنوب بميل 15 درجة.',
+    name:   'عدن',
+    psh:    5.5,
+    heat:   1.15,
+    temp:   1.10,
+    note:   'عدن: حرارة شديدة تؤثر على الألواح والبطاريات. تم إضافة هامش أمان 15% على سعة البطاريات. يُنصح بتهوية جيدة لمنع غليان الإلكتروليت.',
+    tilt:   'وجّه الألواح نحو الجنوب بميل 15 درجة.',
     tips: [
-      'ركّب البطاريات في مكان مظلل وجيد التهوية. الحرارة اكبر عدو للبطارية في عدن.',
-      'افحص مستوى ماء بطاريات الاسيد كل شهر. الحرارة تسرع التبخر.',
-      'استخدم كيبلات مقاومة للاشعة فوق البنفسجية (UV). شمس عدن تتلف العزل.',
-      'وجّه الالواح نحو الجنوب الجغرافي بميل 15 درجة.'
+      'ركّب البطاريات في مكان مظلل وجيد التهوية — الحرارة أكبر عدو لها.',
+      'افحص مستوى ماء البطاريات كل شهر — الحرارة تسرّع التبخر.',
+      'استخدم كيبلات مقاومة لأشعة الشمس (UV Resistant).',
+      'وجّه الألواح نحو الجنوب الجغرافي بميل 15 درجة.'
     ]
   },
   dhale: {
-    name:          'الضالع',
-    psh:           5.0,
-    heatFactor:    1.0,
-    tempFactor:    1.0,
-    infoText:      'الضالع — مناخ معتدل ومرتفعات صافية. زاوية الميل المثالية للالواح 30 درجة نحو الجنوب للحصول على افضل كفاءة سنوية.',
-    tiltTip:       'زاوية الميل المثلى في الضالع: 30 درجة نحو الجنوب.',
+    name:   'الضالع',
+    psh:    5.0,
+    heat:   1.0,
+    temp:   1.0,
+    note:   'الضالع: مناخ معتدل ومرتفعات صافية. زاوية الميل المثالية للألواح 30 درجة نحو الجنوب للحصول على أفضل كفاءة سنوية.',
+    tilt:   'زاوية الميل المثلى في الضالع: 30 درجة نحو الجنوب.',
     tips: [
-      'اضبط زاوية ميل الالواح على 30 درجة نحو الجنوب. يزيد الانتاجية 10-15%.',
-      'رياح الضالع قد تكون قوية. ثبّت الالواح باطارات صلبة جيداً.',
-      'في الشتاء ارفع زاوية الميل قليلاً (35-40 درجة).',
-      'البطاريات في الضالع تعمر اطول بسبب الاعتدال الحراري.'
+      'اضبط زاوية ميل الألواح على 30 درجة نحو الجنوب — يرفع الكفاءة 10-15%.',
+      'رياح الضالع قوية في بعض الأحيان — ثبّت الألواح بإطارات متينة.',
+      'في فصل الشتاء ارفع الزاوية إلى 35-40 درجة.',
+      'البطاريات في الضالع تعمر أطول بسبب الاعتدال الحراري.'
     ]
   }
 };
 
-/* =============================================
-   جدول اسماك الاسلاك القياسية (IEC 60228)
-============================================= */
-var WIRE_SIZES = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50];
-var RHO_NORMAL = 0.0178;  /* مقاومة النحاس عند 20°C */
-var RHO_HOT    = 0.0196;  /* مقاومة النحاس عند 50°C (عدن) */
+/* ================================================
+   جدول أسماك الأسلاك القياسية mm² (IEC 60228)
+   ρ_normal = مقاومة النحاس عند 20°C
+   ρ_hot    = مقاومة النحاس عند 50°C (عدن)
+   ================================================ */
+var WIRE_TBL = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50];
+var RHO_N    = 0.0178;
+var RHO_H    = 0.0196;
 
-/* =============================================
+/* ================================================
    حالة التطبيق
-============================================= */
-var ST = {
-  city:     null,
-  devs:     {},    /* { id: {qty,dayH,nightH} } */
-  dist:     5,
-  voltage:  24,
-  autoDays: 2
+   ================================================ */
+var S = {
+  city:  null,
+  devs:  {},       /* { id: { qty, dayH, nightH } } */
+  dist:  5,
+  volt:  24,
+  days:  2
 };
 
-/* =============================================
-   SPLASH -> APP
-   =============================================
+/* ================================================
 
-   هذا هو القلب — يستخدم setTimeout لـ:
-     1. تشغيل شريط التقدم (2500ms)
-     2. تلاشي شاشة البداية (بإضافة كلاس .fading)
-     3. بعد 500ms من التلاشي: اخفاء splash باضافة .hidden
-     4. في نفس الوقت: ازالة .hidden من appContainer لاظهاره
-*/
-window.addEventListener('load', function () {
-  var splash = document.getElementById('splash');
-  var app    = document.getElementById('appContainer');
+   ██████╗ ██████╗ ███████╗████████╗ █████╗ ██████╗ ████████╗
+   ██╔═══╝ ╚═══██╗██╔════╝╚══██╔══╝██╔══██╗██╔══██╗╚══██╔══╝
+   ███████╗  ████╔╝███████╗   ██║   ███████║██████╔╝   ██║
+   ╚════██║  ╚══██╗╚════██║   ██║   ██╔══██║██╔══██╗   ██║
+   ██████╔╝ ██████╔╝███████║   ██║   ██║  ██║██║  ██║   ██║
+   ╚═════╝  ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝
+
+   نقطة الدخول الرئيسية:
+   ======================================
+   يستخدم window.onload لضمان تحميل
+   جميع موارد الصفحة قبل البدء.
+
+   التسلسل:
+     0ms   → الصفحة محملة، splash ظاهرة، mainApp مخفي
+     2800ms → نبدأ تلاشي splash (نضيف .fade-out)
+     3300ms → نخفي splash نهائياً (نضيف .hidden)
+              ونُظهر mainApp (نزيل .hidden منه)
+              ونبني قائمة الأجهزة
+   ================================================ */
+window.onload = function () {
+  var splash   = document.getElementById('splash');
+  var mainApp  = document.getElementById('mainApp');
 
   /*
-   * المرحلة 1: بعد 2500ms — نبدأ التلاشي
+   * التحقق من وجود العناصر الأساسية
+   * في حالة وجود خطأ في HTML سنرى رسالة واضحة
    */
-  setTimeout(function () {
-
-    /* اضافة كلاس التلاشي لـ CSS transition */
-    splash.classList.add('fading');
-
-    /*
-     * المرحلة 2: بعد 500ms من التلاشي — اخفاء splash واظهار app
-     */
-    setTimeout(function () {
-
-      /* اخفاء شاشة البداية */
-      splash.classList.add('hidden');
-
-      /* ازالة hidden من الحاوية الرئيسية لاظهارها */
-      app.classList.remove('hidden');
-
-      /* بناء قائمة الاجهزة */
-      buildDevList();
-      refreshLiveBar();
-
-    }, 500);
-
-  }, 2500);
-});
-
-/* =============================================
-   التنقل بين الخطوات
-============================================= */
-function goStep(n) {
-  if (n === 2 && !ST.city) {
-    toast('اختر المدينة اولاً');
+  if (!splash || !mainApp) {
+    console.error('خبير الشمس: لم يُعثر على عناصر splash أو mainApp في الصفحة');
     return;
   }
 
-  /* اخفاء اللوحة الحالية */
-  var panels = document.querySelectorAll('.step-panel');
+  /*
+   * الخطوة 1: بعد 2800 ميلي ثانية — نبدأ التلاشي
+   * نضيف كلاس fade-out الذي يُفعّل CSS transition
+   */
+  setTimeout(function () {
+    splash.classList.add('fade-out');
+
+    /*
+     * الخطوة 2: بعد 500ms إضافية (إجمالي ~3.3 ثانية)
+     * انتهى الـ transition — نخفي splash ونظهر التطبيق
+     */
+    setTimeout(function () {
+
+      /* إخفاء شاشة الترحيب بإضافة .hidden */
+      splash.classList.add('hidden');
+
+      /* إظهار الحاوية الرئيسية بإزالة .hidden */
+      mainApp.classList.remove('hidden');
+
+      /* بناء قائمة الأجهزة الكهربائية */
+      buildDevList();
+      refreshLiveStrip();
+
+    }, 500);
+
+  }, 2800);
+};
+
+/* ================================================
+   التنقل بين الخطوات
+   ================================================ */
+function goTo(n) {
+  if (n === 2 && !S.city) {
+    toast('الرجاء اختيار المدينة أولاً');
+    return;
+  }
+
+  /* إخفاء جميع اللوحات */
+  var panels = document.querySelectorAll('.panel');
   for (var i = 0; i < panels.length; i++) {
     panels[i].classList.remove('active');
   }
 
-  /* اظهار اللوحة المطلوبة */
-  var target = document.getElementById('panel' + n);
-  if (target) target.classList.add('active');
+  /* إظهار اللوحة المطلوبة */
+  var t = document.getElementById('p' + n);
+  if (t) t.classList.add('active');
 
   /* تحديث مؤشر الخطوات */
-  updateDots(n);
-  ST.currentStep = n;
+  updateStepBar(n);
 
-  /* الصعود للاعلى */
+  /* الصعود لأعلى الصفحة */
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function updateDots(active) {
+function updateStepBar(active) {
   for (var i = 1; i <= 4; i++) {
-    var dot = document.getElementById('dot' + i);
-    if (!dot) continue;
-    dot.classList.remove('active', 'done');
-    if (i < active)      dot.classList.add('done');
-    else if (i === active) dot.classList.add('active');
+    var si = document.getElementById('si' + i);
+    if (!si) continue;
+    si.classList.remove('active', 'done');
+    if (i < active)       si.classList.add('done');
+    else if (i === active) si.classList.add('active');
   }
-  /* تحديث الموصلات */
-  for (var j = 1; j <= 3; j++) {
-    var conn = document.getElementById('conn' + j + (j + 1));
-    if (!conn) continue;
-    if (j < active) conn.classList.add('done');
-    else conn.classList.remove('done');
+
+  /* خطوط الوصل */
+  var pairs = [[1,2],[2,3],[3,4]];
+  for (var j = 0; j < pairs.length; j++) {
+    var ln = document.getElementById('sl' + pairs[j][0] + '' + pairs[j][1]);
+    if (!ln) continue;
+    if (pairs[j][0] < active) ln.classList.add('done');
+    else ln.classList.remove('done');
   }
 }
 
-/* =============================================
-   اختيار المدينة
-============================================= */
-function pickCity(el) {
-  /* ازالة التحديد من الكل */
+/* ================================================
+   الخطوة 1: اختيار المدينة
+   ================================================ */
+function chooseCity(el) {
+  /* إزالة التحديد من كل البطاقات */
   var cards = document.querySelectorAll('.city-card');
   for (var i = 0; i < cards.length; i++) {
-    cards[i].classList.remove('selected');
+    cards[i].classList.remove('picked');
   }
 
-  el.classList.add('selected');
-  ST.city = el.dataset.city;
+  el.classList.add('picked');
+  S.city = el.dataset.city;
 
-  /* شارة المدينة في الهيدر */
-  var badge = document.getElementById('cityBadge');
-  badge.textContent = CITIES[ST.city].name;
-  badge.classList.remove('hidden');
+  /* تحديث الهيدر */
+  var hc = document.getElementById('headerCity');
+  hc.textContent = CITIES[S.city].name;
+  hc.classList.remove('hidden');
 
-  /* صندوق المعلومات */
-  var box = document.getElementById('cityInfoBox');
-  box.textContent = CITIES[ST.city].infoText;
-  box.classList.remove('hidden');
+  /* ملاحظة المدينة */
+  var nb = document.getElementById('cityNote');
+  nb.textContent = CITIES[S.city].note;
+  nb.classList.remove('hidden');
 
   /* تفعيل زر التالي */
-  document.getElementById('btnStep1Next').disabled = false;
+  document.getElementById('btn1next').disabled = false;
 }
 
-/* =============================================
-   الخطوة 2 — بناء قائمة الاجهزة
-============================================= */
+/* ================================================
+   الخطوة 2: بناء قائمة الأجهزة
+   ================================================ */
 function buildDevList() {
-  /* تهيئة الحالة */
+  /* تهيئة حالة الأجهزة */
   for (var d = 0; d < DEVICES.length; d++) {
-    ST.devs[DEVICES[d].id] = { qty: 0, dayH: 4, nightH: 3 };
+    S.devs[DEVICES[d].id] = { qty: 0, dayH: 4, nightH: 3 };
   }
 
-  /* تجميع الاجهزة حسب التصنيف */
+  /* تجميع حسب التصنيف */
   var cats = {};
   for (var k = 0; k < DEVICES.length; k++) {
-    var dev = DEVICES[k];
-    if (!cats[dev.cat]) cats[dev.cat] = [];
-    cats[dev.cat].push(dev);
+    var dv = DEVICES[k];
+    if (!cats[dv.cat]) cats[dv.cat] = [];
+    cats[dv.cat].push(dv);
   }
 
   var html = '';
-  var catNames = Object.keys(cats);
+  var catKeys = Object.keys(cats);
 
-  for (var c = 0; c < catNames.length; c++) {
-    var catName = catNames[c];
-    var catDevs = cats[catName];
+  for (var c = 0; c < catKeys.length; c++) {
+    var catName = catKeys[c];
+    var catArr  = cats[catName];
 
-    html += '<div class="dev-category">';
-    html += '<div class="cat-label">' + catName + '</div>';
+    html += '<div class="dev-cat">';
+    html += '<div class="cat-name">' + catName + '</div>';
 
-    for (var x = 0; x < catDevs.length; x++) {
-      var dv = catDevs[x];
-      var surgeTag = dv.motor
-        ? '<span class="surge-tag">Surge x' + dv.surge + '</span>'
+    for (var x = 0; x < catArr.length; x++) {
+      var dev = catArr[x];
+      var stag = dev.surge > 1
+        ? '<span class="stag">Surge ×' + dev.surge + '</span>'
         : '';
 
-      html += '<div class="dev-item" id="dev-' + dv.id + '">';
+      html += '<div class="dev-card" id="dc-' + dev.id + '">';
 
-      /* الهيدر */
-      html += '<div class="dev-header" onclick="toggleDev('' + dv.id + '')">';
-      html += '  <div class="dev-ico">' + dv.icon + '</div>';
-      html += '  <div class="dev-info">';
-      html += '    <div class="dev-name">' + dv.name + '</div>';
-      html += '    <div class="dev-watt">' + surgeTag + dv.w + ' وات</div>';
+      /* الجزء العلوي (قابل للنقر) */
+      html += '<div class="dev-top" onclick="toggleDev(\'' + dev.id + '\')">';
+      html += '  <div class="dev-ico">' + dev.icon + '</div>';
+      html += '  <div class="dev-meta">';
+      html += '    <div class="dev-name">' + dev.name + '</div>';
+      html += '    <div class="dev-watt">' + stag + dev.w + ' وات</div>';
       html += '  </div>';
-      html += '  <div class="dev-counter">';
-      html += '    <button class="cnt-btn minus" onclick="chgQty(event,'' + dv.id + '',-1)">&#8722;</button>';
-      html += '    <span class="cnt-num" id="qty-' + dv.id + '">0</span>';
-      html += '    <button class="cnt-btn plus"  onclick="chgQty(event,'' + dv.id + '',+1)">+</button>';
+      html += '  <div class="dev-ctr">';
+      html += '    <button class="cbtn2 m" onclick="adjQty(event,\'' + dev.id + '\',-1)">−</button>';
+      html += '    <span class="dev-qty" id="dq-' + dev.id + '">0</span>';
+      html += '    <button class="cbtn2 p" onclick="adjQty(event,\'' + dev.id + '\',+1)">+</button>';
       html += '  </div>';
       html += '</div>';
 
       /* ساعات التشغيل */
-      html += '<div class="dev-hours">';
-      html += '  <div class="hours-grid">';
-      html += '    <div class="hours-col">';
-      html += '      <div class="hours-lbl">&#9728; ساعات النهار</div>';
-      html += '      <div class="slider-row">';
-      html += '        <input type="range" min="0" max="12" value="4" class="hr-slider" id="dayS-' + dv.id + '" oninput="chgHours('' + dv.id + '','day',this.value)">';
-      html += '        <span class="hr-num" id="dayV-' + dv.id + '">4</span>';
-      html += '      </div>';
-      html += '    </div>';
-      html += '    <div class="hours-col">';
-      html += '      <div class="hours-lbl">&#127769; ساعات الليل</div>';
-      html += '      <div class="slider-row">';
-      html += '        <input type="range" min="0" max="12" value="3" class="hr-slider night" id="nightS-' + dv.id + '" oninput="chgHours('' + dv.id + '','night',this.value)">';
-      html += '        <span class="hr-num night" id="nightV-' + dv.id + '">3</span>';
-      html += '      </div>';
-      html += '    </div>';
-      html += '  </div>';
-      html += '  <div class="dev-wh-preview">';
-      html += '    <span>استهلاك هذا الجهاز / يوم</span>';
-      html += '    <span id="devWh-' + dv.id + '">0 Wh</span>';
-      html += '  </div>';
-      html += '</div>';
+      html += '<div class="dev-hrs">';
+      html += '  <div class="hrs-grid">';
 
-      html += '</div>'; /* end dev-item */
+      /* نهار */
+      html += '    <div class="hrs-col">';
+      html += '      <div class="hrs-lbl">☀ ساعات النهار</div>';
+      html += '      <div class="hrs-row">';
+      html += '        <input type="range" min="0" max="12" value="4" class="hslider" id="ds-' + dev.id + '" oninput="adjH(\'' + dev.id + '\',\'day\',this.value)">';
+      html += '        <span class="hnum" id="dv-' + dev.id + '">4</span>';
+      html += '      </div>';
+      html += '    </div>';
+
+      /* ليل */
+      html += '    <div class="hrs-col">';
+      html += '      <div class="hrs-lbl">🌙 ساعات الليل</div>';
+      html += '      <div class="hrs-row">';
+      html += '        <input type="range" min="0" max="12" value="3" class="hslider night" id="ns-' + dev.id + '" oninput="adjH(\'' + dev.id + '\',\'night\',this.value)">';
+      html += '        <span class="hnum n" id="nv-' + dev.id + '">3</span>';
+      html += '      </div>';
+      html += '    </div>';
+
+      html += '  </div>';
+
+      /* معاينة الاستهلاك */
+      html += '  <div class="dev-wh-row">';
+      html += '    <span>استهلاك هذا الجهاز / يوم</span>';
+      html += '    <span id="dwh-' + dev.id + '">0 Wh</span>';
+      html += '  </div>';
+
+      html += '</div>'; /* end dev-hrs */
+      html += '</div>'; /* end dev-card */
     }
 
-    html += '</div>'; /* end dev-category */
+    html += '</div>'; /* end dev-cat */
   }
 
-  document.getElementById('devicesList').innerHTML = html;
+  document.getElementById('devList').innerHTML = html;
 }
 
 function toggleDev(id) {
-  var item = document.getElementById('dev-' + id);
-  if (ST.devs[id] && ST.devs[id].qty > 0) {
-    item.classList.toggle('open');
+  var card = document.getElementById('dc-' + id);
+  if (S.devs[id] && S.devs[id].qty > 0) {
+    card.classList.toggle('open');
   }
 }
 
-function chgQty(e, id, delta) {
+function adjQty(e, id, delta) {
   e.stopPropagation();
-  var s   = ST.devs[id];
+  var s   = S.devs[id];
   s.qty   = Math.max(0, Math.min(10, s.qty + delta));
+  document.getElementById('dq-' + id).textContent = s.qty;
 
-  document.getElementById('qty-' + id).textContent = s.qty;
-
-  var item = document.getElementById('dev-' + id);
+  var card = document.getElementById('dc-' + id);
   if (s.qty > 0) {
-    item.classList.add('open');
+    card.classList.add('open');
   } else {
-    item.classList.remove('open');
+    card.classList.remove('open');
   }
 
   refreshDevWh(id);
-  refreshLiveBar();
+  refreshLiveStrip();
 }
 
-function chgHours(id, type, val) {
+function adjH(id, type, val) {
   var n = parseInt(val);
   if (type === 'day') {
-    ST.devs[id].dayH = n;
-    document.getElementById('dayV-' + id).textContent = n;
+    S.devs[id].dayH = n;
+    document.getElementById('dv-' + id).textContent = n;
   } else {
-    ST.devs[id].nightH = n;
-    document.getElementById('nightV-' + id).textContent = n;
+    S.devs[id].nightH = n;
+    document.getElementById('nv-' + id).textContent = n;
   }
   refreshDevWh(id);
-  refreshLiveBar();
+  refreshLiveStrip();
+}
+
+/* حساب Wh لجهاز واحد */
+function devWh(dev, s) {
+  if (s.qty === 0) return 0;
+  /* الثلاجة: Duty Cycle 40% — لا تعمل باستمرار */
+  var w = dev.fridge ? dev.w * 0.4 : dev.w;
+  return w * s.qty * (s.dayH + s.nightH);
 }
 
 function refreshDevWh(id) {
-  var dev = getDevById(id);
+  var dev = findDev(id);
   if (!dev) return;
-  var s   = ST.devs[id];
-  var wh  = calcDevWh(dev, s);
-  document.getElementById('devWh-' + id).textContent = Math.round(wh) + ' Wh';
+  var wh = devWh(dev, S.devs[id]);
+  document.getElementById('dwh-' + id).textContent = Math.round(wh) + ' Wh';
 }
 
-/*
- * حساب Wh لجهاز واحد
- * الثلاجة: Duty Cycle 40% (لا تعمل باستمرار)
- */
-function calcDevWh(dev, s) {
-  if (s.qty === 0) return 0;
-  var ew = dev.w;
-  if (dev.id === 'fridge_s' || dev.id === 'fridge_l') ew = dev.w * 0.4;
-  return ew * s.qty * (s.dayH + s.nightH);
-}
-
-function refreshLiveBar() {
-  var sum = getTotals();
-  document.getElementById('lbDevices').textContent = sum.devCount + ' جهاز';
-  document.getElementById('lbWh').textContent      = Math.round(sum.totalWh) + ' Wh';
-  document.getElementById('lbPeak').textContent    = Math.round(sum.peak) + ' W';
-}
-
+/* حساب إجماليات الأحمال */
 function getTotals() {
-  var totalWh = 0, dayWh = 0, nightWh = 0, peak = 0, devCount = 0;
-  var maxSurgeExtra = 0;
+  var total = 0, day = 0, night = 0, peak = 0, cnt = 0, maxExtra = 0;
 
   for (var i = 0; i < DEVICES.length; i++) {
     var dev = DEVICES[i];
-    var s   = ST.devs[dev.id];
+    var s   = S.devs[dev.id];
     if (!s || s.qty === 0) continue;
-    devCount++;
+    cnt++;
 
-    var ew = dev.w;
-    if (dev.id === 'fridge_s' || dev.id === 'fridge_l') ew = dev.w * 0.4;
+    var w = dev.fridge ? dev.w * 0.4 : dev.w;
+    day   += w * s.qty * s.dayH;
+    night += w * s.qty * s.nightH;
+    peak  += w * s.qty;
 
-    dayWh   += ew * s.qty * s.dayH;
-    nightWh += ew * s.qty * s.nightH;
-    peak    += ew * s.qty;
-
-    /* الـ Surge: اضافة فرق اعلى جهاز surge فقط */
-    var extra = ew * s.qty * (dev.surge - 1.0);
-    if (extra > maxSurgeExtra) maxSurgeExtra = extra;
+    /*
+     * حساب Surge:
+     * نأخذ فرق أعلى جهاز surge فقط
+     * (نادراً ما تبدأ جميع الأجهزة في وقت واحد)
+     */
+    var extra = w * s.qty * (dev.surge - 1.0);
+    if (extra > maxExtra) maxExtra = extra;
   }
 
-  totalWh = dayWh + nightWh;
-  var surgeLoad = peak + maxSurgeExtra;
+  total = day + night;
 
   return {
-    totalWh:   totalWh,
-    dayWh:     dayWh,
-    nightWh:   nightWh,
-    peak:      peak,
-    surgeLoad: surgeLoad,
-    devCount:  devCount
+    total:    total,
+    day:      day,
+    night:    night,
+    peak:     peak,
+    surge:    peak + maxExtra,
+    cnt:      cnt
   };
 }
 
-/* =============================================
-   الخطوة 3 — التوصيل
-============================================= */
-function chgDist(d) {
-  var inp = document.getElementById('distInput');
-  inp.value = Math.max(1, Math.min(100, parseInt(inp.value || 5) + d));
-  ST.dist = parseInt(inp.value);
-  refreshWireHint();
+function refreshLiveStrip() {
+  var t = getTotals();
+  document.getElementById('ls-cnt').textContent = t.cnt + ' جهاز';
+  document.getElementById('ls-wh').textContent  = Math.round(t.total) + ' Wh';
+  document.getElementById('ls-pk').textContent  = Math.round(t.peak) + ' W';
 }
 
-function onDistInput() {
-  ST.dist = parseInt(document.getElementById('distInput').value || 5);
-  refreshWireHint();
+/* ================================================
+   الخطوة 3: التوصيل
+   ================================================ */
+function adjDist(d) {
+  var inp = document.getElementById('distVal');
+  inp.value = Math.max(1, Math.min(100, parseInt(inp.value || 5) + d));
+  S.dist = parseInt(inp.value);
+  refreshWireNote();
+}
+
+function onDist() {
+  S.dist = parseInt(document.getElementById('distVal').value || 5);
+  refreshWireNote();
 }
 
 function setDist(v) {
-  document.getElementById('distInput').value = v;
-  ST.dist = v;
-  document.querySelectorAll('.preset').forEach(function (b) { b.classList.remove('sel'); });
-  var btn = document.querySelector('.preset[onclick="setDist(' + v + ')"]');
-  if (btn) btn.classList.add('sel');
-  refreshWireHint();
+  document.getElementById('distVal').value = v;
+  S.dist = v;
+  document.querySelectorAll('.pbt').forEach(function (b) { b.classList.remove('on'); });
+  var btn = document.querySelector('.pbt[onclick="setDist(' + v + ')"]');
+  if (btn) btn.classList.add('on');
+  refreshWireNote();
 }
 
 function pickVolt(el) {
-  document.querySelectorAll('.volt-opt').forEach(function (v) { v.classList.remove('selected'); });
-  el.classList.add('selected');
-  ST.voltage = parseInt(el.dataset.v);
-  refreshWireHint();
+  document.querySelectorAll('.vopt').forEach(function (v) { v.classList.remove('sel'); });
+  el.classList.add('sel');
+  S.volt = parseInt(el.dataset.v);
+  refreshWireNote();
 }
 
 function pickAuto(el) {
-  document.querySelectorAll('.auto-opt').forEach(function (a) { a.classList.remove('selected'); });
-  el.classList.add('selected');
-  ST.autoDays = parseInt(el.dataset.d);
-}
-
-function refreshWireHint() {
-  var sum = getTotals();
-  if (sum.peak === 0) {
-    document.getElementById('wireHint').textContent = '&#128268; اضف الاجهزة اولاً لرؤية التوصية';
-    return;
-  }
-  var I  = sum.peak / ST.voltage;
-  var mm = calcWire(ST.dist, I, ST.city === 'aden');
-  document.getElementById('wireHint').textContent =
-    'مسافة ' + ST.dist + 'م — تيار ' + Math.round(I) + 'A — سلك ' + mm + ' mm2 موصى به';
+  document.querySelectorAll('.aopt').forEach(function (a) { a.classList.remove('sel'); });
+  el.classList.add('sel');
+  S.days = parseInt(el.dataset.d);
 }
 
 /*
- * حساب سُمك السلك بمعادلة هبوط الجهد
+ * حساب سُمك السلك — معادلة هبوط الجهد:
  *
- * DV_max = V x 0.03       (اقصى هبوط مسموح = 3% من الجهد)
- * A_min  = 2 x L x I x rho / DV_max
- * الضرب في 2: التيار يمر ذهاباً وايابا
+ *   ΔV_max = V × 0.03          (أقصى هبوط مسموح = 3%)
+ *   A_min  = (2 × L × I × ρ) / ΔV_max
+ *
+ * الضرب في 2: التيار يسافر ذهاباً وإياباً
  */
 function calcWire(L, I, isHot) {
-  var rho  = isHot ? RHO_HOT : RHO_NORMAL;
-  var dvMax = ST.voltage * 0.03;
-  var aMin  = (2 * L * I * rho) / dvMax;
-  for (var i = 0; i < WIRE_SIZES.length; i++) {
-    if (WIRE_SIZES[i] >= aMin) return WIRE_SIZES[i];
+  var rho  = isHot ? RHO_H : RHO_N;
+  var dvmx = S.volt * 0.03;
+  var amin = (2 * L * I * rho) / dvmx;
+  for (var i = 0; i < WIRE_TBL.length; i++) {
+    if (WIRE_TBL[i] >= amin) return WIRE_TBL[i];
   }
-  return WIRE_SIZES[WIRE_SIZES.length - 1];
+  return WIRE_TBL[WIRE_TBL.length - 1];
 }
 
-/* =============================================
-   الخطوة 4 — الحسابات الكاملة
-============================================= */
-function doCalc() {
-  if (!ST.city) { toast('اختر المدينة اولاً'); return; }
+function refreshWireNote() {
+  var t = getTotals();
+  if (t.peak === 0) {
+    document.getElementById('wireNote').textContent = '🔌 أضف الأجهزة أولاً لرؤية التوصية';
+    return;
+  }
+  var I  = t.peak / S.volt;
+  var mm = calcWire(S.dist, I, S.city === 'aden');
+  document.getElementById('wireNote').textContent =
+    'مسافة ' + S.dist + 'م — تيار ' + Math.round(I) + 'A — موصى بسلك ' + mm + ' mm²';
+}
 
-  var sum = getTotals();
-  if (sum.devCount === 0) { toast('اضف جهازاً واحداً على الاقل'); return; }
+/* ================================================
+   الخطوة 4: الحسابات الكاملة
+   ================================================ */
+function calcNow() {
+  if (!S.city) { toast('اختر المدينة أولاً'); return; }
+  var t = getTotals();
+  if (t.cnt === 0) { toast('أضف جهازاً واحداً على الأقل'); return; }
 
-  var city = CITIES[ST.city];
-  var V    = ST.voltage;
+  var city = CITIES[S.city];
+  var V    = S.volt;
 
-  /*
-   * 2) قوة الالواح
-   * P = (Wh_total / PSH) x F_sys x F_temp
-   * F_sys  = 1.25 (خسائر النظام: كيبلات + اتربة + شحن + حرارة)
-   * F_temp = معامل حرارة الالواح للمدينة
+  /* ---- 2) الألواح الشمسية ----
+   *
+   * P_panels = (Wh_total / PSH) × F_sys × F_temp
+   *
+   * PSH    = ساعات الذروة الشمسية للمدينة
+   * F_sys  = 1.25 (خسائر النظام: أتربة + كيبلات + شحن/تفريغ + حرارة)
+   * F_temp = معامل الحرارة على الألواح
    */
-  var pWh   = (sum.totalWh / city.psh) * 1.25 * city.tempFactor;
-  var pSize = pickPanelSize(pWh);
-  var pCnt  = Math.ceil(pWh / pSize);
-  var pTot  = pCnt * pSize;
+  var pReq  = (t.total / city.psh) * 1.25 * city.temp;
+  var pSz   = panelSize(pReq);
+  var pCnt  = Math.ceil(pReq / pSz);
+  var pTot  = pCnt * pSz;
 
-  /*
-   * 3) سعة البطاريات
-   * Ah = (Wh x Days) / (V x DoD x eta) x F_heat
-   * DoD  = 0.5 (لا نفرّغ البطارية اكثر من 50%)
-   * eta  = 0.85 (كفاءة البطارية)
-   * F_heat = معامل الحرارة للمدينة (عدن: 1.15)
+  /* ---- 3) البطاريات ----
+   *
+   * Ah = (Wh × أيام) / (V × DoD × η) × F_heat
+   *
+   * DoD    = 0.5  ← أهم رقم: لا نفرّغ البطارية أكثر من 50%
+   *                   هذا يُضاعف عمرها الافتراضي
+   * η      = 0.85 ← كفاءة البطارية
+   * F_heat = معامل حرارة المدينة (عدن: 1.15)
    */
-  var rawAh = (sum.totalWh * ST.autoDays) / (V * 0.5 * 0.85);
-  var totAh = Math.ceil(rawAh * city.heatFactor);
+  var rawAh = (t.total * S.days) / (V * 0.5 * 0.85);
+  var totAh = Math.ceil(rawAh * city.heat);
+  var bSz   = batSize(totAh);
+  var bCnt  = Math.ceil(totAh / bSz);
+  var bType = batType(totAh, V);
 
-  var bSize  = pickBattSize(totAh);
-  var bCnt   = Math.ceil(totAh / bSize);
-  var bType  = pickBattType(totAh, V);
-
-  /*
-   * 4) المحول (Inverter)
-   * VA = SurgeLoad x 1.25 / PF
-   * PF = 0.8 (احمال مختلطة)
+  /* ---- 4) المحول (Inverter) ----
+   *
+   * VA = SurgeLoad × F_safety / PF
+   *
+   * F_safety = 1.25 (هامش أمان 25%)
+   * PF       = 0.8  (معامل القدرة للأحمال المختلطة)
    */
-  var invVA  = Math.ceil((sum.surgeLoad * 1.25) / 0.8);
+  var invVA  = Math.ceil((t.surge * 1.25) / 0.8);
   var invStd = roundUp(invVA, [500,700,1000,1500,2000,3000,4000,5000,6000,8000,10000]);
 
-  /*
-   * 5) سُمك السلك
-   * I_wire = P_panels / V_sys
-   * A = (2 x L x I x rho) / (V x 0.03)
+  /* ---- 5) سُمك السلك ----
+   *
+   * I = P_panels / V_system
+   * A = (2 × L × I × ρ) / (V × 0.03)
    */
-  var I_w    = pTot / V;
-  var wireS  = calcWire(ST.dist, I_w, ST.city === 'aden');
-  var vdrop  = (2 * ST.dist * I_w * RHO_NORMAL) / wireS;
-  var vdropP = ((vdrop / V) * 100).toFixed(1);
+  var Iw    = pTot / V;
+  var wireMM = calcWire(S.dist, Iw, S.city === 'aden');
+  var vdrop = (2 * S.dist * Iw * RHO_N) / wireMM;
+  var vdPct = ((vdrop / V) * 100).toFixed(1);
 
-  /*
-   * 6) وحدة الشحن (Charge Controller)
-   * I_cc = (P_panels / V) x 1.25
+  /* ---- 6) وحدة الشحن (MPPT) ----
+   *
+   * I_cc = (P_panels / V) × 1.25
    */
-  var Icc  = Math.ceil((pTot / V) * 1.25);
-  var ccA  = roundUp(Icc, [10,20,30,40,50,60,80,100]);
+  var Icc   = Math.ceil((pTot / V) * 1.25);
+  var ccAmp = roundUp(Icc, [10,20,30,40,50,60,80,100]);
 
   /* عرض النتائج */
   showResults({
-    totalWh: sum.totalWh, dayWh: sum.dayWh, nightWh: sum.nightWh, peak: sum.peak,
-    pCnt: pCnt, pSize: pSize, pTot: pTot, pWh: pWh,
-    totAh: totAh, bCnt: bCnt, bSize: bSize, bType: bType,
-    invStd: invStd, invVA: invVA,
-    wireS: wireS, vdropP: vdropP, dist: ST.dist,
-    Icc: Icc, ccA: ccA,
-    city: city, devCount: sum.devCount
+    total: t.total, day: t.day, night: t.night, peak: t.peak,
+    pCnt, pSz, pTot, pReq,
+    totAh, bCnt, bSz, bType,
+    invStd, invVA,
+    wireMM, vdPct,
+    Icc, ccAmp,
+    city, devCnt: t.cnt
   });
 
-  goStep(4);
+  goTo(4);
 }
 
-/* ---- دوال مساعدة ---- */
-function pickPanelSize(w) {
+/* --- دوال مساعدة للحسابات --- */
+function panelSize(w) {
   if (w <= 200)  return 100;
   if (w <= 600)  return 200;
   if (w <= 1200) return 300;
@@ -529,7 +567,7 @@ function pickPanelSize(w) {
   return 500;
 }
 
-function pickBattSize(ah) {
+function batSize(ah) {
   var sizes = [250, 200, 150, 120, 100];
   for (var i = 0; i < sizes.length; i++) {
     if (ah / sizes[i] <= 6) return sizes[i];
@@ -537,10 +575,10 @@ function pickBattSize(ah) {
   return 100;
 }
 
-function pickBattType(ah, v) {
-  if (ah * v > 5000) return 'ليثيوم LiFePO4 او جل Gel';
-  if (ah > 300)      return 'جل Gel او AGM مغلقة';
-  return 'AGM مغلقة او تقليدية';
+function batType(ah, v) {
+  if (ah * v > 5000) return 'ليثيوم LiFePO4 أو جل Gel';
+  if (ah > 300)      return 'جل Gel أو AGM مغلقة';
+  return 'AGM مغلقة أو تقليدية';
 }
 
 function roundUp(v, arr) {
@@ -550,181 +588,182 @@ function roundUp(v, arr) {
   return arr[arr.length - 1];
 }
 
-function getDevById(id) {
+function findDev(id) {
   for (var i = 0; i < DEVICES.length; i++) {
     if (DEVICES[i].id === id) return DEVICES[i];
   }
   return null;
 }
 
-/* =============================================
-   عرض النتائج
-============================================= */
+/* ================================================
+   عرض النتائج في الواجهة
+   ================================================ */
 function showResults(r) {
-  var V    = ST.voltage;
+  var V    = S.volt;
   var city = r.city;
 
-  document.getElementById('resultCity').textContent =
-    city.name + ' — ' + r.devCount + ' اجهزة';
+  /* العنوان الفرعي */
+  document.getElementById('resCity').textContent = city.name + ' — ' + r.devCnt + ' أجهزة';
 
   /* الاستهلاك */
-  document.getElementById('rTotalWh').textContent  = Math.round(r.totalWh);
-  document.getElementById('rDayWh').textContent    = Math.round(r.dayWh) + ' Wh';
-  document.getElementById('rNightWh').textContent  = Math.round(r.nightWh) + ' Wh';
-  document.getElementById('rPeak').textContent     = Math.round(r.peak) + ' W';
+  document.getElementById('rTotWh').textContent   = Math.round(r.total);
+  document.getElementById('rDayWh').textContent   = Math.round(r.day) + ' Wh';
+  document.getElementById('rNightWh').textContent = Math.round(r.night) + ' Wh';
+  document.getElementById('rPeak').textContent    = Math.round(r.peak) + ' W';
 
-  /* الالواح */
-  document.getElementById('rPanels').textContent   = r.pCnt;
-  document.getElementById('rPanelsD').innerHTML    =
-    r.pCnt + ' لوح x ' + r.pSize + ' وات<br>اجمالي: ' + r.pTot + ' وات<br>مطلوب: ' + Math.round(r.pWh) + ' وات';
-  document.getElementById('rPanelsTip').textContent = city.tiltTip;
+  /* الألواح */
+  document.getElementById('rPanCnt').textContent = r.pCnt;
+  document.getElementById('rPanDet').innerHTML   =
+    r.pCnt + ' لوح × ' + r.pSz + ' وات<br>الإجمالي: ' + r.pTot + ' وات<br>المطلوب: ' + Math.round(r.pReq) + ' وات';
+  document.getElementById('rPanTip').textContent = city.tilt;
 
   /* البطاريات */
-  document.getElementById('rBattAh').textContent   = r.totAh;
-  document.getElementById('rBattD').innerHTML      =
-    r.bCnt + ' بطارية x ' + r.bSize + ' Ah<br>جهد: ' + V + 'V<br>النوع: ' + r.bType;
-  document.getElementById('rBattTip').innerHTML    =
-    'مهم: لا تفرّغ البطارية اكثر من 50%. هذا يُضاعف عمرها الافتراضي.' +
-    (ST.city === 'aden' ? ' (اضيف +15% للحرارة)' : '');
+  document.getElementById('rBatAh').textContent = r.totAh;
+  document.getElementById('rBatDet').innerHTML  =
+    r.bCnt + ' بطارية × ' + r.bSz + ' Ah<br>الجهد: ' + V + ' فولت<br>النوع: ' + r.bType;
+  document.getElementById('rBatTip').innerHTML  =
+    'مهم: لا تفرّغ البطارية أكثر من 50% — هذا يُضاعف عمرها الافتراضي.' +
+    (S.city === 'aden' ? ' (تم إضافة +15% تعويض حراري لعدن)' : '');
 
   /* المحول */
-  document.getElementById('rInv').textContent      = r.invStd;
-  document.getElementById('rInvD').innerHTML       =
-    'حمل جاري: ' + Math.round(r.peak) + ' W<br>موصى به: ' + r.invStd + ' VA';
-  document.getElementById('rInvTip').textContent   =
-    'يجب ان يدعم Pure Sine Wave لحماية الاجهزة الحساسة';
+  document.getElementById('rInvVA').textContent = r.invStd;
+  document.getElementById('rInvDet').innerHTML  =
+    'الحمل الجاري: ' + Math.round(r.peak) + ' وات<br>الحمل الأقصى مع Surge: ' + Math.round(r.peak * 1.4) + ' وات<br>الموصى به: ' + r.invStd + ' VA';
+  document.getElementById('rInvTip').textContent = 'يجب أن يدعم Pure Sine Wave لحماية الأجهزة الحساسة';
 
-  /* الاسلاك */
-  document.getElementById('rWire').textContent     = r.wireS;
-  document.getElementById('rWireD').innerHTML      =
-    'مسافة: ' + r.dist + ' متر<br>هبوط الجهد: ' + r.vdropP + '% (مقبول)';
-  document.getElementById('rWireTip').textContent  =
-    'استخدم نحاساً خالصاً وليس الومنيوم. النحاس اامن واطول عمراً';
+  /* الأسلاك */
+  document.getElementById('rWireMM').textContent = r.wireMM;
+  document.getElementById('rWireDet').innerHTML  =
+    'المسافة: ' + S.dist + ' متر<br>هبوط الجهد: ' + r.vdPct + '% (ضمن الحد المقبول 3%)';
+  document.getElementById('rWireTip').textContent = 'استخدم نحاساً خالصاً وليس ألومنيوم — النحاس أأمن وأطول عمراً';
 
   /* وحدة الشحن */
-  document.getElementById('rCC').textContent       = r.ccA;
-  document.getElementById('rCCD').innerHTML        =
-    'MPPT افضل من PWM بـ 15-30%<br>جهد: ' + V + 'V — تيار: ' + r.Icc + 'A';
-  document.getElementById('rCCTip').textContent    =
-    'MPPT اغلى ثمناً لكنها توفر 15-30% طاقة اضافية';
+  document.getElementById('rCCAmp').textContent = r.ccAmp;
+  document.getElementById('rCCDet').innerHTML   =
+    'النوع الموصى به: MPPT (أكفأ من PWM بنسبة 15-30%)<br>الجهد: ' + V + ' فولت — التيار: ' + r.Icc + ' أمبير';
+  document.getElementById('rCCTip').textContent = 'MPPT أغلى لكنها تزيد الطاقة المنتجة بنسبة 15-30%';
 
-  /* النصائح */
-  var tips = city.tips.concat([
-    'اشتري بطاريات ' + r.bType + ' من مصادر موثوقة. البطاريات المقلدة السبب الاول في تلف المنظومة.',
-    'لا تشغّل الغسالة والمضخة معاً. الـ Surge المشترك قد يحرق المحول.',
-    'افحص البطاريات كل 3 اشهر. تحقق من الجهد الكامل ومستوى الماء.'
+  /* نصائح الخبير */
+  var allTips = city.tips.concat([
+    'اشتر بطاريات ' + r.bType + ' من مصادر موثوقة. البطاريات المقلدة السبب رقم 1 في تلف المنظومة.',
+    'لا تشغّل الغسالة والمضخة في وقت واحد — الـ Surge المشترك قد يحرق المحول.',
+    'افحص البطاريات كل 3 أشهر وتحقق من الجهد الكامل ومستوى الماء.'
   ]);
 
-  var tHTML = '';
-  for (var i = 0; i < tips.length; i++) {
-    tHTML += '<li>' + tips[i] + '</li>';
+  var tHtml = '';
+  for (var i = 0; i < allTips.length; i++) {
+    tHtml += '<li>' + allTips[i] + '</li>';
   }
-  document.getElementById('tipsList').innerHTML = tHTML;
+  document.getElementById('tipsList').innerHTML = tHtml;
 
   /* نص المشاركة */
-  var txt =
-    'خبير الشمس — روشتة المنظومة الشمسية
-' +
-    '==============================
-' +
-    'المنطقة: ' + city.name + '
-' +
-    'الاستهلاك اليومي: ' + Math.round(r.totalWh) + ' Wh
-' +
-    '------------------------------
-' +
-    'الالواح: ' + r.pCnt + ' لوح x ' + r.pSize + 'W = ' + r.pTot + 'W
-' +
-    'البطاريات: ' + r.bCnt + ' x ' + r.bSize + 'Ah (' + V + 'V)
-' +
-    'النوع: ' + r.bType + '
-' +
-    'المحول: ' + r.invStd + ' VA
-' +
-    'وحدة الشحن MPPT: ' + r.ccA + 'A
-' +
-    'سُمك الاسلاك: ' + r.wireS + ' mm2
-' +
-    '------------------------------
-' +
-    'تنبيه: لا تفرّغ البطارية اكثر من 50%
-' +
-    city.tiltTip + '
-' +
-    '==============================
-' +
-    'Yemen Solar Expert';
+  var shareText =
+    'خبير الشمس — روشتة المنظومة الشمسية\n' +
+    '=====================================\n' +
+    'المنطقة: ' + city.name + '\n' +
+    'الاستهلاك اليومي: ' + Math.round(r.total) + ' Wh\n' +
+    '-------------------------------------\n' +
+    'الألواح: ' + r.pCnt + ' لوح × ' + r.pSz + 'W = ' + r.pTot + 'W\n' +
+    'البطاريات: ' + r.bCnt + ' × ' + r.bSz + 'Ah (' + V + 'V)\n' +
+    'النوع: ' + r.bType + '\n' +
+    'المحول: ' + r.invStd + ' VA (Pure Sine Wave)\n' +
+    'وحدة الشحن: MPPT ' + r.ccAmp + 'A\n' +
+    'سُمك الأسلاك: ' + r.wireMM + ' mm²\n' +
+    '-------------------------------------\n' +
+    'تنبيه: لا تفرّغ البطارية أكثر من 50%\n' +
+    city.tilt + '\n' +
+    '=====================================\n' +
+    'صدر من: خبير الشمس — Yemen Solar Expert';
 
-  document.getElementById('shareBox').textContent = txt;
-  window._shareText = txt;
+  document.getElementById('shareBox').textContent = shareText;
+  window._shareText = shareText;
 }
 
-/* =============================================
-   واتساب + نسخ
-============================================= */
+/* ================================================
+   المشاركة
+   ================================================ */
 function doWA() {
   if (window._shareText) {
     window.open('https://wa.me/?text=' + encodeURIComponent(window._shareText), '_blank');
+  } else {
+    toast('لا توجد روشتة للمشاركة');
   }
 }
 
 function doCopy() {
-  if (!window._shareText) return;
-  var btn = document.getElementById('copyBtn');
-  if (navigator.clipboard) {
+  if (!window._shareText) { toast('لا توجد روشتة للنسخ'); return; }
+  var btn = document.getElementById('cpBtn');
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(window._shareText).then(function () {
       btn.classList.add('copied');
-      btn.innerHTML = '&#10003; تم النسخ';
-      toast('تم النسخ بنجاح');
+      btn.textContent = '✓ تم النسخ';
+      toast('تم نسخ الروشتة بنجاح');
       setTimeout(function () {
         btn.classList.remove('copied');
-        btn.innerHTML = '&#128203; نسخ';
+        btn.textContent = '📋 نسخ';
       }, 2500);
+    }).catch(function () {
+      fallbackCopy();
     });
   } else {
-    /* Fallback للمتصفحات القديمة */
-    var ta = document.createElement('textarea');
-    ta.value = window._shareText;
-    ta.style.position = 'fixed';
-    ta.style.opacity  = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    toast('تم النسخ بنجاح');
+    fallbackCopy();
   }
 }
 
-/* =============================================
-   اعادة الضبط
-============================================= */
-function doReset() {
-  ST.city     = null;
-  ST.devs     = {};
-  ST.dist     = 5;
-  ST.voltage  = 24;
-  ST.autoDays = 2;
-
-  document.querySelectorAll('.city-card').forEach(function (c) { c.classList.remove('selected'); });
-  document.getElementById('cityBadge').classList.add('hidden');
-  document.getElementById('cityInfoBox').classList.add('hidden');
-  document.getElementById('btnStep1Next').disabled = true;
-  document.getElementById('distInput').value = 5;
-  document.getElementById('wireHint').textContent = 'اضف الاجهزة اولاً';
-
-  buildDevList();
-  refreshLiveBar();
-  goStep(1);
-  toast('تم اعادة الضبط');
+function fallbackCopy() {
+  /* للمتصفحات التي لا تدعم Clipboard API */
+  var ta       = document.createElement('textarea');
+  ta.value     = window._shareText;
+  ta.style.position = 'fixed';
+  ta.style.opacity  = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand('copy');
+    toast('تم النسخ');
+  } catch (e) {
+    toast('لم يتمكن من النسخ — انسخ يدوياً من الصندوق');
+  }
+  document.body.removeChild(ta);
 }
 
-/* =============================================
-   Toast
-============================================= */
+/* ================================================
+   إعادة ضبط التطبيق
+   ================================================ */
+function doReset() {
+  S.city = null;
+  S.devs = {};
+  S.dist = 5;
+  S.volt = 24;
+  S.days = 2;
+
+  /* إعادة ضبط الواجهة */
+  document.querySelectorAll('.city-card').forEach(function (c) { c.classList.remove('picked'); });
+  document.getElementById('headerCity').classList.add('hidden');
+  document.getElementById('cityNote').classList.add('hidden');
+  document.getElementById('btn1next').disabled = true;
+  document.getElementById('distVal').value = 5;
+  document.getElementById('wireNote').textContent = '🔌 أضف الأجهزة أولاً';
+
+  /* إعادة بناء قائمة الأجهزة */
+  buildDevList();
+  refreshLiveStrip();
+
+  goTo(1);
+  toast('تم إعادة الضبط بنجاح');
+}
+
+/* ================================================
+   Toast — إشعار مؤقت
+   ================================================ */
 function toast(msg) {
-  var el = document.getElementById('toastMsg');
+  var el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
-  setTimeout(function () { el.classList.remove('show'); }, 2500);
+  setTimeout(function () {
+    el.classList.remove('show');
+  }, 2600);
 }
 
